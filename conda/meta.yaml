@@ -1,0 +1,32 @@
+{% set build = pr_num %}
+{% set strbuild = "build_" + build|string %}
+{% set version = "1.0" %}
+
+package:
+  name: ncrc
+  version: {{ version }}
+
+source:
+  path: ../ncrc
+
+build:
+  number: {{ build }}  # [linux,osx]
+  string: {{ strbuild }}
+  skip: true # [win]
+
+requirements:
+  run:
+    - python
+
+test:
+  imports:
+    - ncrc
+
+about:
+  home: https://mooseframework.org/
+  license: LGPL 2.1
+  summary: 'Install Conda packages behind a secured location'
+
+extra:
+  recipe-maintainers:
+    - milljm
