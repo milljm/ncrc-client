@@ -1,4 +1,4 @@
-{% set build = pr_num %}
+{% set build = 0 %}
 {% set strbuild = "build_" + build|string %}
 {% set version = "1.0" %}
 
@@ -7,20 +7,27 @@ package:
   version: {{ version }}
 
 source:
-  path: ../ncrc
+  path: ../../ncrc-client
 
 build:
+  noarch: python
   number: {{ build }}  # [linux,osx]
   string: {{ strbuild }}
   skip: true # [win]
 
 requirements:
+  host:
+    - python
   run:
     - python
+    - requests
+    - conda
 
 test:
   imports:
     - ncrc
+  commands:
+    - test -f $PREFIX/bin/ncrc
 
 about:
   home: https://mooseframework.org/
