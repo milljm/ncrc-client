@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, re, sys, getpass, argparse, requests, urllib, urllib3
+import os, sys, getpass, argparse, requests, urllib, urllib3
 
 # Disable SSL Certificate warning (for now)
 from urllib3.exceptions import InsecureRequestWarning
@@ -34,6 +34,9 @@ class Client:
             print("Unable to establish a connection to https://%s\n\nPlease check your https_proxy environment.\nMore help can be found at: https://mooseframework.inl.gov/help/inl/hpc_remote.html" % (self.__args.uri))
         except urllib3.exceptions.ProxySchemeUnknown:
             print("Proxy information incorrect: %s" % (os.getenv("https_proxy")))
+        except ConnectionRefusedError:
+            print("Connection refused, please try again.")
+
         sys.exit(1)
 
     def getCredentials(self):
@@ -46,7 +49,7 @@ class Client:
         print('Installing %s, this can take a very long time. Please be patient...' % (self.__args.application))
         try:
             conda_api.run_command('create',
-                                  '-n', self.__args.application,
+                                  '--name', self.__args.application,
                                   '--channel', channel,
                                   '--channel', 'idaholab',
                                   '--channel', 'conda-forge',
@@ -56,20 +59,16 @@ class Client:
             conda_api.run_command('clean', '--all')
             print('%s installed. To use, switch to the same named environment:\n\n\tconda activate %s' % (self.__args.application, self.__args.application))
 
-        except:
-            print('There was an error installing %s' % (self.__args.application))
+        except Exception as e:
+            print('There was an error installing %s:\n%s' % (self.__args.application, e))
             sys.exit(1)
 
     def update(self):
-        active_env = re.compile('active environment : (\w+)')
-        env = active_env.findall(conda_api.run_command('info')[0])[0]
-        if env != self.__args.application:
-            print('You must first activate the environment you intend to update:\n\n\tconda activate %s' % (self.__args.application))
-            sys.exit(1)
         try:
             channel = self.getChannel()
             conda_api.run_command('update',
                                   '--all',
+                                  '--name', self.__args.application,
                                   '--channel', channel,
                                   '--channel', 'idaholab',
                                   '--channel', 'conda-forge',
@@ -77,8 +76,8 @@ class Client:
             conda_api.run_command('clean', '--all')
             print('%s updated, or was already up-to-date' % (self.__args.application))
 
-        except:
-            print('There was an error updating %s' % (self.__args.application))
+        except Exception as e:
+            print('There was an error updating %s:\n%s' % (self.__args.application, e))
             sys.exit(1)
 
 def verifyArgs(parser):
