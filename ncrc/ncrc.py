@@ -11,7 +11,7 @@ logging.getLogger(requests.packages.urllib3.__package__).setLevel(logging.ERROR)
 try:
     import conda.cli.python_api as conda_api
 except:
-    print("Unable to import Conda's API.")
+    print('Unable to import Conda API. Please install conda: `conda install conda`')
     sys.exit(1)
 
 class Client:
@@ -25,17 +25,17 @@ class Client:
             if response.status_code == 200:
                 return 'https://%s:%s@%s/%s' % (user, password, self.__args.uri, self.__args.application)
             elif response.status_code == 401:
-                print("Invalid credentials, permission denied.")
+                print('Invalid credentials, permission denied.')
             elif response.status_code == 404:
-                print("Application not available.")
+                print('Application not available.')
             else:
-                print("Enable to get channel. Error: %s" % (response.status_code))
+                print('Enable to get channel. Error: %s' % (response.status_code))
         except requests.exceptions.ConnectTimeout:
-            print("Unable to establish a connection to https://%s\n\nPlease check your https_proxy environment.\nMore help can be found at: https://mooseframework.inl.gov/help/inl/hpc_remote.html" % (self.__args.uri))
+            print('Unable to establish a connection to https://%s\n\nPlease check your https_proxy environment.\nMore help can be found at: https://mooseframework.inl.gov/help/inl/hpc_remote.html' % (self.__args.uri))
         except urllib3.exceptions.ProxySchemeUnknown:
-            print("Proxy information incorrect: %s" % (os.getenv("https_proxy")))
-        except ConnectionRefusedError:
-            print("Connection refused, please try again.")
+            print('Proxy information incorrect: %s' % (os.getenv('https_proxy')))
+        except urllib3.exceptions.NewConnectionError:
+            print('Connection refused, please try again.')
 
         sys.exit(1)
 
@@ -57,7 +57,7 @@ class Client:
                                   'ncrc',
                                   self.__args.application)
             conda_api.run_command('clean', '--all')
-            print('%s installed. To use, switch to the same named environment:\n\n\tconda activate %s' % (self.__args.application, self.__args.application))
+            print('%s installed. To use, switch to the %s environment:\n\n\tconda activate %s' % (self.__args.application, self.__args.application, self.__args.application))
 
         except Exception as e:
             print('There was an error installing %s:\n%s' % (self.__args.application, e))
@@ -77,7 +77,7 @@ class Client:
             print('%s updated, or was already up-to-date' % (self.__args.application))
 
         except Exception as e:
-            print('There was an error updating %s:\n%s' % (self.__args.application, e))
+            print('There was an error updating %s:\n%s' % (self.__args.application, e), '\nTry deactivating the environment first:\n\t`conda deactivate; ncrc update %s`' % (self.__args.application))
             sys.exit(1)
 
 def verifyArgs(parser):
