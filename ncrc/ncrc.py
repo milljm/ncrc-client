@@ -21,7 +21,7 @@ class Client:
     def getChannel(self):
         (user, password) = self.getCredentials()
         try:
-            response = requests.get('https://%s/%s/' % (self.__args.uri, self.__args.application), auth=(user, password), verify=False, timeout=5)
+            response = requests.get('https://%s/%s/index.html' % (self.__args.uri, self.__args.application), auth=(user, password), verify=False, timeout=5)
             if response.status_code == 200:
                 return 'https://%s:%s@%s/%s' % (user, password, self.__args.uri, self.__args.application)
             elif response.status_code == 401:
@@ -54,7 +54,7 @@ class Client:
                                   '--channel', 'idaholab',
                                   '--channel', 'conda-forge',
                                   '--strict-channel-priority',
-                                  'conda',
+                                  'ncrc',
                                   self.__args.application)
             conda_api.run_command('clean', '--all')
             print('%s installed. To use, switch to the same named environment:\n\n\tconda activate %s' % (self.__args.application, self.__args.application))
