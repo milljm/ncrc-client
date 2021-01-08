@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import os, sys, getpass, argparse, requests, urllib, urllib3, json
 
+# Sigh. Conda API is broken (clean does not work)
+import subprocess
+
 # Disable SSL Certificate warning (for now)
 from urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
@@ -84,7 +87,11 @@ class Client:
                                   stdout=sys.stdout,
                                   stderr=sys.stderr)
 
-            conda_api.run_command('clean', '--all')
+            # Sad panda, Conda API does not work
+            # conda_api.run_command('clean', '--all')
+            # Use subprocess to call `conda clean --all --yes` manually
+            clean_conda = subprocess.Popen(['conda', 'clean', '--yes', '--all'], stdout=subprocess.DEVNULL)
+            clean_conda.wait()
 
             # remove clear text password from meta file to protect the user.
             # This password is not visible using any conda commands. But it
