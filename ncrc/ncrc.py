@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, sys, getpass, argparse, requests, urllib, urllib3
+import os, sys, getpass, argparse, requests, urllib, urllib3, json
 
 # Disable SSL Certificate warning (for now)
 from urllib3.exceptions import InsecureRequestWarning
@@ -40,14 +40,39 @@ class Client:
         sys.exit(1)
 
     def getCredentials(self):
-        user = input("Username: ")
-        password = getpass.getpass()
-        return (user, password)
+        try:
+            if not self.__args.username:
+                self.__args.username = input("Username: ")
+            if not self.__args.password:
+                self.__args.password = getpass.getpass()
+        except KeyboardInterrupt:
+            sys.exit(1)
+        return (self.__args.username, self.__args.password)
 
     def install(self):
         channel = self.getChannel()
-        print('Installing %s, this can take a very long time. Please be patient...' % (self.__args.application))
+        print('Installing %s...' % (self.__args.application))
         try:
+            (raw_std, raw_err, exit_code) = conda_api.run_command('search',
+                                                                  self.__args.application,
+                                                                  '--channel', channel,
+                                                                  '--info',
+                                                                  '--json')
+            package_info = json.loads(raw_std)
+
+            (raw_std, raw_err, exit_code) = conda_api.run_command('info',
+                                                                  '--json')
+            conda_info = json.loads(raw_std)
+
+            file_name = '-'.join([self.__args.application,
+                                  package_info[self.__args.application][0]['version'],
+                                  package_info[self.__args.application][0]['build']])
+
+            meta_files = [ os.path.sep.join([env_dir,
+                                             self.__args.application,
+                                             'conda-meta',
+                                             '%s.json' % (file_name)]) for env_dir in conda_info['envs_dirs'] ]
+
             conda_api.run_command('create',
                                   '--name', self.__args.application,
                                   '--channel', channel,
@@ -55,12 +80,26 @@ class Client:
                                   '--channel', 'conda-forge',
                                   '--strict-channel-priority',
                                   'ncrc',
-                                  self.__args.application)
-            conda_api.run_command('clean', '--all')
-            print('%s installed. To use, switch to the %s environment:\n\n\tconda activate %s' % (self.__args.application, self.__args.application, self.__args.application))
+                                  self.__args.application,
+                                  stdout=sys.stdout,
+                                  stderr=sys.stderr)
 
-        except Exception as e:
-            print('There was an error installing %s:\n%s' % (self.__args.application, e))
+            conda_api.run_command('clean', '--all')
+
+            # remove clear text password from meta file to protect the user.
+            # This password is not visible using any conda commands. But it
+            # is written inside this meta file in clear text on the system,
+            # and no one wants that.
+            for meta_file in meta_files:
+                if os.path.exists(meta_file):
+                    with open(meta_file, 'r+') as f:
+                        meta_json = json.load(f)
+                        meta_json['url'] = "https://%s/%s" % (self.__args.uri, self.__args.application)
+                        f.seek(0)
+                        json.dump(meta_json, f)
+                        f.truncate()
+
+        except Exception:
             sys.exit(1)
 
     def update(self):
@@ -68,16 +107,15 @@ class Client:
             channel = self.getChannel()
             conda_api.run_command('update',
                                   '--all',
-                                  '--name', self.__args.application,
                                   '--channel', channel,
                                   '--channel', 'idaholab',
                                   '--channel', 'conda-forge',
-                                  '--strict-channel-priority')
+                                  '--strict-channel-priority',
+                                  stdout=sys.stdout,
+                                  stderr=sys.stderr)
             conda_api.run_command('clean', '--all')
-            print('%s updated, or was already up-to-date' % (self.__args.application))
 
-        except Exception as e:
-            print('There was an error updating %s:\n%s' % (self.__args.application, e), '\nTry deactivating the environment first:\n\t`conda deactivate; ncrc update %s`' % (self.__args.application))
+        except Exception:
             sys.exit(1)
 
 def verifyArgs(parser):
@@ -94,7 +132,13 @@ def parseArgs():
     subparser.required = True
 
     install_parser = subparser.add_parser('install', parents=[parent], help='Install application', formatter_class=formatter)
+    install_parser.add_argument('-u', '--username', help='Supply username instead of being challenged for one')
+    install_parser.add_argument('-p', '--password', help='Supply password instead of being challenged for one')
+
     update_parser = subparser.add_parser('update', parents=[parent], help='Update application', formatter_class=formatter)
+    update_parser.add_argument('-u', '--username', help='Supply username instead of being challenged for one')
+    update_parser.add_argument('-p', '--password', help='Supply password instead of being challenged for one')
+
     return verifyArgs(parser)
 
 if __name__ == '__main__':
