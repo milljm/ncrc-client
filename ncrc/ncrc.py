@@ -55,75 +55,76 @@ class Client:
     def install(self):
         channel = self.getChannel()
         print('Installing %s...' % (self.__args.application))
-        try:
-            (raw_std, raw_err, exit_code) = conda_api.run_command('search',
-                                                                  self.__args.application,
-                                                                  '--channel', channel,
-                                                                  '--info',
-                                                                  '--json')
-            package_info = json.loads(raw_std)
-
-            (raw_std, raw_err, exit_code) = conda_api.run_command('info',
-                                                                  '--json')
-            conda_info = json.loads(raw_std)
-
-            file_name = '-'.join([self.__args.application,
-                                  package_info[self.__args.application][0]['version'],
-                                  package_info[self.__args.application][0]['build']])
-
-            meta_files = [ os.path.sep.join([env_dir,
-                                             self.__args.application,
-                                             'conda-meta',
-                                             '%s.json' % (file_name)]) for env_dir in conda_info['envs_dirs'] ]
-
-            conda_api.run_command('create',
-                                  '--name', self.__args.application,
-                                  '--channel', channel,
-                                  '--channel', 'idaholab',
-                                  '--channel', 'conda-forge',
-                                  '--strict-channel-priority',
-                                  'ncrc',
-                                  self.__args.application,
-                                  stdout=sys.stdout,
-                                  stderr=sys.stderr)
-
-            # Sad panda, Conda API does not work
-            # conda_api.run_command('clean', '--all')
-            # Use subprocess to call `conda clean --all --yes` manually
-            clean_conda = subprocess.Popen(['conda', 'clean', '--yes', '--all'], stdout=subprocess.DEVNULL)
-            clean_conda.wait()
-
-            # remove clear text password from meta file to protect the user.
-            # This password is not visible using any conda commands. But it
-            # is written inside this meta file in clear text on the system,
-            # and no one wants that.
-            for meta_file in meta_files:
-                if os.path.exists(meta_file):
-                    with open(meta_file, 'r+') as f:
-                        meta_json = json.load(f)
-                        meta_json['url'] = "https://%s/%s" % (self.__args.uri, self.__args.application)
-                        f.seek(0)
-                        json.dump(meta_json, f)
-                        f.truncate()
-
-        except Exception:
-            sys.exit(1)
+        conda_api.run_command('create',
+                              '--name', self.__args.application,
+                              '--channel', channel,
+                              '--channel', 'idaholab',
+                              '--channel', 'conda-forge',
+                              '--strict-channel-priority',
+                              'ncrc',
+                              self.__args.application,
+                              stdout=sys.stdout,
+                              stderr=sys.stderr)
+        print('Finalizing...')
+        self.cleanUp(channel)
 
     def update(self):
-        try:
-            channel = self.getChannel()
-            conda_api.run_command('update',
-                                  '--all',
-                                  '--channel', channel,
-                                  '--channel', 'idaholab',
-                                  '--channel', 'conda-forge',
-                                  '--strict-channel-priority',
-                                  stdout=sys.stdout,
-                                  stderr=sys.stderr)
-            conda_api.run_command('clean', '--all')
+        channel = self.getChannel()
+        conda_api.run_command('update',
+                              '--all',
+                              '--channel', channel,
+                              '--channel', 'idaholab',
+                              '--channel', 'conda-forge',
+                              '--strict-channel-priority',
+                              stdout=sys.stdout,
+                              stderr=sys.stderr)
+        print('Finalizing...')
+        self.cleanUp(channel)
 
-        except Exception:
-            sys.exit(1)
+    def findMeta(self, channel):
+        (raw_std, raw_err, exit_code) = conda_api.run_command('search',
+                                                              self.__args.application,
+                                                              '--channel', channel,
+                                                              '--override-channels',
+                                                              '--info',
+                                                              '--json')
+        package_info = json.loads(raw_std)
+        (raw_std, raw_err, exit_code) = conda_api.run_command('info', '--json')
+        conda_info = json.loads(raw_std)
+        file_names = []
+        for version in package_info[self.__args.application]:
+            file_names.append('-'.join([self.__args.application,
+                                        version['version'],
+                                        version['build']]))
+        meta_files = []
+        for file_name in file_names:
+            for env_dir in conda_info['envs_dirs']:
+                meta_files.append(os.path.sep.join([env_dir,
+                                                    self.__args.application,
+                                                    'conda-meta',
+                                                    '%s.json' % (file_name)]))
+        return meta_files
+
+    def cleanUp(self, channel):
+        """
+        Perform clean up operation; remove protected tarball(s),
+        clear text passwords, etc
+        """
+        # Conda clean API does not work
+        # conda_api.run_command('clean', '--all')
+        clean_conda = subprocess.Popen(['conda', 'clean', '--yes', '--all'], stdout=subprocess.DEVNULL)
+        clean_conda.wait()
+
+        # Remove clear text password from meta file to protect the user.
+        meta_files = self.findMeta(channel)
+        for meta_file in meta_files:
+            if os.path.exists(meta_file):
+                with open(meta_file, 'r+') as f:
+                    meta_json = json.load(f)
+                    meta_json['url'] = "https://%s/%s" % (self.__args.uri, self.__args.application)
+                    f.seek(0)
+                    json.dump(meta_json, f)
+                    f.truncate()
 
 def verifyArgs(parser):
     return parser.parse_args()
