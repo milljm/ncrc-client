@@ -10,3 +10,6 @@ Version: $PKG_VERSION
 Summary: Secure Conda Channel helper
 Platform: UNKNOWN
 FAKE_EGG
+
+# what the heck... why does this work???
+sleep 5
