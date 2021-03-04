@@ -60,9 +60,7 @@ class Client:
         return (self.__args.username, self.__args.password)
 
     def toggleSSL(self, ssl_value=None):
-        if ssl_value is None:
-            ssl_value = self.__orig
-
+        ssl_value = self.__orig if ssl_value is None else ssl_value
         if ssl_value != self.ssl_verify:
             conda_api.run_command('config',
                                   '--set', 'ssl_verify', str(ssl_value))
