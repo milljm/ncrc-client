@@ -20,6 +20,13 @@ except:
 class Client:
     def __init__(self, args):
         self.__args = args
+        ssl_verify = conda_api.run_command('config',
+                                           '--get', 'ssl_verify')[0]
+        self.ssl_verify = False
+        if 'True' in ssl_verify:
+            self.ssl_verify = not self.ssl_verify
+
+        self.__orig = self.ssl_verify
 
     def getChannel(self):
         (user, password) = self.getCredentials()
@@ -52,6 +59,15 @@ class Client:
             sys.exit(1)
         return (self.__args.username, self.__args.password)
 
+    def toggleSSL(self, ssl_value=None):
+        if ssl_value is None:
+            ssl_value = self.__orig
+
+        if ssl_value != self.ssl_verify:
+            conda_api.run_command('config',
+                                  '--set', 'ssl_verify', str(ssl_value))
+            self.ssl_verify = not self.ssl_verify
+
     def install(self):
         channel = self.getChannel()
         print('Installing %s...' % (self.__args.application))
@@ -80,6 +96,15 @@ class Client:
                               stderr=sys.stderr)
         print('Finalizing...')
         self.cleanUp(channel)
+
+    def search(self):
+        channel = self.getChannel()
+        conda_api.run_command('search',
+                              '--override-channels',
+                              '--channel', channel,
+                              '*%s*' % (self.__args.application),
+                              stdout=sys.stdout,
+                              stderr=sys.stderr)
 
     def findMeta(self, channel):
         (raw_std, raw_err, exit_code) = conda_api.run_command('search',
@@ -147,13 +172,21 @@ def parseArgs():
     update_parser.add_argument('-u', '--username', help='Supply username instead of being challenged for one')
     update_parser.add_argument('-p', '--password', help='Supply password instead of being challenged for one')
 
+    search_parser = subparser.add_parser('search', parents=[parent], help='Search for application', formatter_class=formatter)
+    search_parser.add_argument('-u', '--username', help='Supply username instead of being challenged for one')
+    search_parser.add_argument('-p', '--password', help='Supply password instead of being challenged for one')
+
     return verifyArgs(parser)
 
 if __name__ == '__main__':
     args = parseArgs()
     ncrc = Client(args)
+    ncrc.toggleSSL(False)
     if args.command == 'install':
         ncrc.install()
     elif args.command == 'update':
         ncrc.update()
+    elif args.command == 'search':
+        ncrc.search()
+    ncrc.toggleSSL()
     sys.exit(0)
