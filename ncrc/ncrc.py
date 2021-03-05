@@ -130,6 +130,9 @@ class Client:
         # env_dir
         for env_dir in conda_info['envs_dirs']:
             meta_files.append(os.path.join(env_dir, self.__args.package, 'conda-meta', 'history'))
+            meta_files.append(os.path.join(env_dir, 'conda-meta', 'history'))
+            meta_files.append(os.path.join(os.path.sep, *env_dir.split(os.path.sep)[:-1], 'conda-meta', 'history'))
+            meta_files.append(os.path.join(os.path.sep, *env_dir.split(os.path.sep)[:-1], 'conda-meta', self.__args.package + '*'))
             meta_files.append(os.path.join(env_dir, self.__args.package, 'conda-meta', self.__args.package + '*'))
 
         # correct for wild cards
@@ -151,11 +154,12 @@ class Client:
         clean_conda = subprocess.Popen(['conda', 'clean', '--yes', '--all'], stdout=subprocess.DEVNULL)
         clean_conda.wait()
         meta_files = self.findMeta()
+        stuff = self.getCredentials()
         for meta_file in meta_files:
             if os.path.exists(meta_file):
                 with open(meta_file, 'r+') as f:
                     raw = f.read()
-                    _new = raw.replace(self.__args.password, '*************')
+                    _new = raw.replace('%s:%s@' % (self.__args.username, self.__args.password), '')
                     f.seek(0)
                     f.write(_new)
                     f.truncate()
