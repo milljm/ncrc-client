@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, sys, getpass, argparse, requests, urllib, urllib3, json
+import os, sys, getpass, argparse, requests, urllib, urllib3, json, re
 
 # Sigh. Conda API is broken (clean does not work)
 import subprocess
@@ -20,6 +20,10 @@ except:
 class Client:
     def __init__(self, args):
         self.__args = args
+        self.__channel_common = ['--channel', 'idaholab',
+                                 '--channel', 'conda-forge',
+                                 '--strict-channel-priority']
+
         ssl_verify = conda_api.run_command('config',
                                            '--get', 'ssl_verify')[0]
         self.ssl_verify = False
@@ -31,9 +35,9 @@ class Client:
     def getChannel(self):
         (user, password) = self.getCredentials()
         try:
-            response = requests.get('https://%s/%s/index.html' % (self.__args.uri, self.__args.application), auth=(user, password), verify=False, timeout=5)
+            response = requests.get('https://%s/%s/index.html' % (self.__args.uri, self.__args.package), auth=(user, password), verify=False, timeout=5)
             if response.status_code == 200:
-                return 'https://%s:%s@%s/%s' % (user, password, self.__args.uri, self.__args.application)
+                return 'https://%s:%s@%s/%s' % (user, password, self.__args.uri, self.__args.package)
             elif response.status_code == 401:
                 print('Invalid credentials, permission denied.')
             elif response.status_code == 404:
@@ -68,89 +72,109 @@ class Client:
 
     def install(self):
         channel = self.getChannel()
+        (raw_std, raw_err, exit_code) = conda_api.run_command('info', '--json')
+        info = json.loads(raw_std)
+        active_env = os.path.basename(info['active_prefix'])
         print('Installing %s...' % (self.__args.application))
-        conda_api.run_command('create',
-                              '--name', self.__args.application,
-                              '--channel', channel,
-                              '--channel', 'idaholab',
-                              '--channel', 'conda-forge',
-                              '--strict-channel-priority',
-                              'ncrc',
-                              self.__args.application,
-                              stdout=sys.stdout,
-                              stderr=sys.stderr)
+        if active_env == self.__args.package:
+            conda_api.run_command('install',
+                                  '--channel', channel,
+                                  *self.__channel_common,
+                                  'ncrc',
+                                  self.__args.application,
+                                  stdout=sys.stdout,
+                                  stderr=sys.stderr)
+        else:
+            conda_api.run_command('create',
+                                  '--name', self.__args.package,
+                                  '--channel', channel,
+                                  *self.__channel_common,
+                                  'ncrc',
+                                  self.__args.application,
+                                  stdout=sys.stdout,
+                                  stderr=sys.stderr)
         print('Finalizing...')
-        self.cleanUp(channel)
+        self.cleanUp()
 
     def update(self):
         channel = self.getChannel()
         conda_api.run_command('update',
                               '--all',
                               '--channel', channel,
-                              '--channel', 'idaholab',
-                              '--channel', 'conda-forge',
-                              '--strict-channel-priority',
+                              *self.__channel_common,
                               stdout=sys.stdout,
                               stderr=sys.stderr)
         print('Finalizing...')
-        self.cleanUp(channel)
+        self.cleanUp()
 
     def search(self):
         channel = self.getChannel()
         conda_api.run_command('search',
                               '--override-channels',
                               '--channel', channel,
-                              '*%s*' % (self.__args.application),
+                              '*%s*' % (self.__args.package),
                               stdout=sys.stdout,
                               stderr=sys.stderr)
+        self.cleanUp()
 
-    def findMeta(self, channel):
-        (raw_std, raw_err, exit_code) = conda_api.run_command('search',
-                                                              self.__args.application,
-                                                              '--channel', channel,
-                                                              '--override-channels',
-                                                              '--info',
-                                                              '--json')
-        package_info = json.loads(raw_std)
+    def findMeta(self):
         (raw_std, raw_err, exit_code) = conda_api.run_command('info', '--json')
         conda_info = json.loads(raw_std)
-        file_names = []
-        for version in package_info[self.__args.application]:
-            file_names.append('-'.join([self.__args.application,
-                                        version['version'],
-                                        version['build']]))
+
         meta_files = []
-        for file_name in file_names:
-            for env_dir in conda_info['envs_dirs']:
-                meta_files.append(os.path.sep.join([env_dir,
-                                                    self.__args.application,
-                                                    'conda-meta',
-                                                    '%s.json' % (file_name)]))
+        # pkgs_dir
+        for pkg_dir in conda_info['pkgs_dirs']:
+            meta_files.append(os.path.join(pkg_dir, 'urls.txt'))
+            meta_files.append(os.path.join(pkg_dir, self.__args.package + '*', 'info', 'repodata_record.json'))
+
+        # env_dir
+        for env_dir in conda_info['envs_dirs']:
+            meta_files.append(os.path.join(env_dir, self.__args.package, 'conda-meta', 'history'))
+            meta_files.append(os.path.join(env_dir, self.__args.package, 'conda-meta', self.__args.package + '*'))
+
+        # correct for wild cards
+        app_find = re.compile(self.__args.package + '.*')
+        for i, meta_file in enumerate(meta_files):
+            dirname = os.path.dirname(meta_file.split('*')[0])
+            if '*' in meta_file and os.path.exists(dirname):
+                for item in os.listdir(dirname):
+                    if app_find.findall(item):
+                        meta_files[i] = meta_file.replace(self.__args.package + '*', app_find.findall(item)[0])
+
         return meta_files
 
-    def cleanUp(self, channel):
+    def cleanUp(self):
         """
-        Perform clean up operation; remove protected tarball(s),
+        Perform clean up operation;
         clear text passwords, etc
         """
-        # Conda clean API does not work
-        # conda_api.run_command('clean', '--all')
         clean_conda = subprocess.Popen(['conda', 'clean', '--yes', '--all'], stdout=subprocess.DEVNULL)
         clean_conda.wait()
-
-        # Remove clear text password from meta file to protect the user.
-        meta_files = self.findMeta(channel)
+        meta_files = self.findMeta()
         for meta_file in meta_files:
             if os.path.exists(meta_file):
                 with open(meta_file, 'r+') as f:
-                    meta_json = json.load(f)
-                    meta_json['url'] = "https://%s/%s" % (self.__args.uri, self.__args.application)
+                    raw = f.read()
+                    _new = raw.replace(self.__args.password, '*************')
                     f.seek(0)
-                    json.dump(meta_json, f)
+                    f.write(_new)
                     f.truncate()
 
 def verifyArgs(parser):
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.application:
+        print('You must supply an NCRC Application to update')
+        sys.exit(1)
+    if len(args.application.split('=')) > 2:
+        (args.package, args.version, args.build) = args.application.split('=')
+    elif len(args.application.split('=')) > 1:
+        (args.package, args.version) = args.application.split('=')
+        args.build = None
+    else:
+        args.package = args.application
+        args.build = None
+        args.version = None
+    return args
 
 def parseArgs():
     parser = argparse.ArgumentParser(description='Manage NCRC packages')
