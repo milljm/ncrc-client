@@ -156,7 +156,7 @@ class Client:
         meta_files = self.findMeta()
         stuff = self.getCredentials()
         for meta_file in meta_files:
-            if os.path.exists(meta_file):
+            if os.path.exists(meta_file) and os.access(meta_file, os.W_OK):
                 with open(meta_file, 'r+') as f:
                     raw = f.read()
                     _new = raw.replace('%s:%s@' % (self.__args.username, self.__args.password), '')
