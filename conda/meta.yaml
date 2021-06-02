@@ -1,38 +1,49 @@
-{% set build = 4 %}
+{% set build = 0 %}
 {% set strbuild = "build_" + build|string %}
-{% set version = "1.1" %}
+{% set name = "ncrc" %}
+{% set version = "1.2" %}
+{% set sha256 = "48a1e4011ef624481644560546c8ccdb8d210b44386b3a8824ced6404dece652" %}
 
 package:
-  name: ncrc
+  name: {{ name }}
   version: {{ version }}
 
 source:
-  path: ../../ncrc-client
+    url: https://hpcgitlab.hpc.inl.gov/idaholab/{{ name }}-client/archive/v{{ version }}.tar.gz
+    sha256: {{ sha256 }}
 
 build:
-  noarch: python
-  number: {{ build }}  # [linux,osx]
+  number: {{ build }}
   string: {{ strbuild }}
-  skip: true # [win]
+  noarch: python
+  script: {{ PYTHON }} -m pip install . --no-deps -vv --upgrade-strategy only-if-needed --use-feature=in-tree-build
+  entry_points:
+    - ncrc = ncrc.__main__:main
 
 requirements:
   host:
-    - python
+    - python >=3.6
+    - requests
+    - conda
+    - pip
   run:
-    - python
+    - python >=3.6
     - requests
     - conda
 
 test:
   imports:
-    - ncrc
+    - rsasecure_login
   commands:
-    - test -f $PREFIX/bin/ncrc
+    - rsasecure_login --help
 
 about:
-  home: https://mooseframework.org/
-  license: LGPL 2.1
-  summary: 'Install Conda packages behind a secured location'
+  home: https://hpcgitlab.hpc.inl.gov/idaholab/ncrc-client
+  license: BSD-3-Clause OR MIT
+  license_file: LICENSE.txt
+  summary: Install Conda packages protected by an RSASecurID location
+  doc_url: https://hpcgitlab.hpc.inl.gov/idaholab/ncrc-client
+  dev_url: https://hpcgitlab.hpc.inl.gov/idaholab/ncrc-client
 
 extra:
   recipe-maintainers:

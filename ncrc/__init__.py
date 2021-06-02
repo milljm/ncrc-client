@@ -1,1 +1,1 @@
-from .ncrc import Client
+from .__main__ import Client
