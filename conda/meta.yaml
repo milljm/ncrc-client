@@ -33,9 +33,9 @@ requirements:
 
 test:
   imports:
-    - rsasecure_login
+    - ncrc
   commands:
-    - rsasecure_login --help
+    - ncrc --help
 
 about:
   home: https://hpcgitlab.hpc.inl.gov/idaholab/ncrc-client
