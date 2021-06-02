@@ -2,14 +2,14 @@
 {% set strbuild = "build_" + build|string %}
 {% set name = "ncrc" %}
 {% set version = "1.2" %}
-{% set sha256 = "48a1e4011ef624481644560546c8ccdb8d210b44386b3a8824ced6404dece652" %}
+{% set sha256 = "673cfb5592eb1b5a8260c6ef542cef2feb1ae241996960e9d09ad8c1c68d5601" %}
 
 package:
   name: {{ name }}
   version: {{ version }}
 
 source:
-    url: https://hpcgitlab.hpc.inl.gov/idaholab/{{ name }}-client/archive/v{{ version }}.tar.gz
+    url: https://hpcgitlab.hpc.inl.gov/idaholab/{{ name }}-client/-/archive/v{{ version }}/{{ name }}-client-v{{ version }}.tar.gz
     sha256: {{ sha256 }}
 
 build:
