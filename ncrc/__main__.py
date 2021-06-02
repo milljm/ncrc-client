@@ -116,10 +116,10 @@ class Client:
                                   '--channel', self.__args.uri,
                                   *self.__channel_common,
                                   '%s-opt%s%s' % (self.__args.package,
-                                              '='.join(self.__args.version) \
-                                              if self.__args.version else '',
-                                              '='.join(self.__args.build) \
-                                              if self.__args.build else ''),
+                                                  '='.join(self.__args.version) \
+                                                      if self.__args.version else '',
+                                                  '='.join(self.__args.build) \
+                                                      if self.__args.build else ''),
                                   stdout=sys.stdout,
                                   stderr=sys.stderr)
         else:
@@ -129,10 +129,10 @@ class Client:
                                   *self.__channel_common,
                                   'ncrc',
                                   '%s-opt%s%s' % (self.__args.package,
-                                              '='.join(self.__args.version) \
-                                              if self.__args.version else '',
-                                              '='.join(self.__args.build) \
-                                              if self.__args.build else ''),
+                                                  '='.join(self.__args.version) \
+                                                      if self.__args.version else '',
+                                                  '='.join(self.__args.build) \
+                                                      if self.__args.build else ''),
                                   stdout=sys.stdout,
                                   stderr=sys.stderr)
 
