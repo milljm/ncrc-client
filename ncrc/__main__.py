@@ -6,6 +6,7 @@ import argparse
 import re
 import pickle
 import json
+import errno
 from urllib.parse import urlparse
 from unittest import mock
 from io import StringIO
@@ -39,7 +40,7 @@ class Client:
             try:
                 os.makedirs(os.path.dirname(cookie_file))
             except OSError as e:
-                if e.errno != e.EEXIST:
+                if e.errno != errno.EEXIST:
                     raise
         with open(cookie_file, 'wb') as f:
             pickle.dump(self.session.cookies, f)
@@ -114,9 +115,11 @@ class Client:
             conda_api.run_command('install',
                                   '--channel', self.__args.uri,
                                   *self.__channel_common,
-                                  '%s%s%s' % (self.__args.package,
-                                              '='.join(self.__args.version) if self.__args.version else '',
-                                              '='.join(self.__args.build) if self.__args.build else ''),
+                                  '%s-opt%s%s' % (self.__args.package,
+                                              '='.join(self.__args.version) \
+                                              if self.__args.version else '',
+                                              '='.join(self.__args.build) \
+                                              if self.__args.build else ''),
                                   stdout=sys.stdout,
                                   stderr=sys.stderr)
         else:
@@ -125,9 +128,11 @@ class Client:
                                   '--channel', self.__args.uri,
                                   *self.__channel_common,
                                   'ncrc',
-                                  '%s%s%s' % (self.__args.package,
-                                              '='.join(self.__args.version) if self.__args.version else '',
-                                              '='.join(self.__args.build) if self.__args.build else ''),
+                                  '%s-opt%s%s' % (self.__args.package,
+                                              '='.join(self.__args.version) \
+                                              if self.__args.version else '',
+                                              '='.join(self.__args.build) \
+                                              if self.__args.build else ''),
                                   stdout=sys.stdout,
                                   stderr=sys.stderr)
 
