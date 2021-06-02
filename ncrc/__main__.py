@@ -3,23 +3,24 @@ import os
 import sys
 import getpass
 import argparse
-import requests
-import urllib3
 import re
 import pickle
 import json
+import errno
 from urllib.parse import urlparse
 from unittest import mock
 from io import StringIO
 import logging
+import requests
+import urllib3
+# pylint: not callable
 logging.getLogger(requests.packages.urllib3.__package__).setLevel(logging.ERROR)
 
 try:
     import conda.cli.python_api as conda_api
     from conda.gateways.connection.session import CondaSession
     from conda.gateways.connection import BaseAdapter
-
-except:
+except ImportError:
     print('Unable to import Conda API. Please install conda: `conda install conda`')
     sys.exit(1)
 
@@ -61,17 +62,19 @@ class Client:
                                     verify=not self.__args.insecure)
         if response.status_code == 200 and 'application' in response.headers['Content-Type']:
             return True
+        return False
 
     def _createSecureConnection(self):
         if self._connectionExists():
             return
         self.session.cookies.clear()
         try:
-            response = self.session.get('https://%s' % (self.__args.fqdn), verify=not self.__args.insecure)
+            response = self.session.get('https://%s' % (self.__args.fqdn),
+                                        verify=not self.__args.insecure)
             if response.status_code != 200:
                 print('ERROR connecting to %s' % (self.__args.fqdn))
                 sys.exit(1)
-            token = re.findall('name="csrftoken" value="(\w+)', response.text)
+            token = re.findall(r'name="csrftoken" value="(\w+)', response.text)
             (username, passcode) = self._getCredentials()
             response = self.session.post('https://%s/webauthentication' % (self.__args.fqdn),
                                          verify=not self.__args.insecure,
@@ -99,14 +102,14 @@ class Client:
         except ValueError:
             print('Unable to determine SOCKS version from https_proxy',
                   'environment variable')
-        except requests.exceptions.ConnectionError as e:
+        except requests.exceptions.ConnectionError:
             print('General error connecting to server: https://%s' % (self.__args.fqdn))
         sys.exit(1)
 
     def install(self):
         self._createSecureConnection()
         print('Installing %s...' % (self.__args.application))
-        (raw_std, raw_err, exit_code) = conda_api.run_command('info', '--json')
+        raw_std = conda_api.run_command('info', '--json')[0]
         info = json.loads(raw_std)
         active_env = os.path.basename(info['active_prefix'])
 
@@ -115,8 +118,10 @@ class Client:
                                   '--channel', self.__args.uri,
                                   *self.__channel_common,
                                   '%s%s%s' % (self.__args.package,
-                                              '='.join(self.__args.version) if self.__args.version else '',
-                                              '='.join(self.__args.build) if self.__args.build else ''),
+                                              '='.join(self.__args.version) \
+                                                  if self.__args.version else '',
+                                              '='.join(self.__args.build) \
+                                                  if self.__args.build else ''),
                                   stdout=sys.stdout,
                                   stderr=sys.stderr)
         else:
@@ -126,8 +131,10 @@ class Client:
                                   *self.__channel_common,
                                   'ncrc',
                                   '%s%s%s' % (self.__args.package,
-                                              '='.join(self.__args.version) if self.__args.version else '',
-                                              '='.join(self.__args.build) if self.__args.build else ''),
+                                              '='.join(self.__args.version) \
+                                                  if self.__args.version else '',
+                                              '='.join(self.__args.build) \
+                                                  if self.__args.build else ''),
                                   stdout=sys.stdout,
                                   stderr=sys.stderr)
 
@@ -222,6 +229,7 @@ def verifyArgs(args, parser):
 
     if args.insecure:
         from urllib3.exceptions import InsecureRequestWarning
+        # pylint: not callable
         requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
     args.fqdn = urlparse('rsa://%s' % (args.server)).hostname
@@ -240,18 +248,12 @@ def parseArgs(argv=None):
                               ' limitation, all channels will be untrusted.'))
     subparser = parser.add_subparsers(dest='command', help='Available Commands.')
     subparser.required = True
-    install_parser = subparser.add_parser('install',
-                                          parents=[parent],
-                                          help='Install application',
-                                          formatter_class=formatter)
-    update_parser = subparser.add_parser('update',
-                                         parents=[parent],
-                                         help='Update application',
-                                         formatter_class=formatter)
-    search_parser = subparser.add_parser('search',
-                                         parents=[parent],
-                                         help='Search for application',
-                                         formatter_class=formatter)
+    subparser.add_parser('install', parents=[parent], help='Install application',
+                         formatter_class=formatter)
+    subparser.add_parser('update', parents=[parent], help='Update application',
+                         formatter_class=formatter)
+    subparser.add_parser('search', parents=[parent], help='Search for application',
+                         formatter_class=formatter)
     args = parser.parse_args(argv)
     return verifyArgs(args, parser)
 
@@ -259,8 +261,8 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv[1:]
     args = parseArgs(argv)
-    from conda.cli import main
-    with mock.patch('conda.gateways.connection.session.CondaSession', return_value=CondaSessionRSA()):
+    with mock.patch('conda.gateways.connection.session.CondaSession',
+                    return_value=CondaSessionRSA()):
         ncrc = Client(args)
         if args.command == 'install':
             ncrc.install()
