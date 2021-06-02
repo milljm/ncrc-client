@@ -13,6 +13,7 @@ from io import StringIO
 import logging
 import requests
 import urllib3
+# pylint: not callable
 logging.getLogger(requests.packages.urllib3.__package__).setLevel(logging.ERROR)
 
 try:
@@ -68,7 +69,8 @@ class Client:
             return
         self.session.cookies.clear()
         try:
-            response = self.session.get('https://%s' % (self.__args.fqdn), verify=not self.__args.insecure)
+            response = self.session.get('https://%s' % (self.__args.fqdn),
+                                        verify=not self.__args.insecure)
             if response.status_code != 200:
                 print('ERROR connecting to %s' % (self.__args.fqdn))
                 sys.exit(1)
@@ -115,11 +117,11 @@ class Client:
             conda_api.run_command('install',
                                   '--channel', self.__args.uri,
                                   *self.__channel_common,
-                                  '%s-opt%s%s' % (self.__args.package,
-                                                  '='.join(self.__args.version) \
-                                                      if self.__args.version else '',
-                                                  '='.join(self.__args.build) \
-                                                      if self.__args.build else ''),
+                                  '%s%s%s' % (self.__args.package,
+                                              '='.join(self.__args.version) \
+                                                  if self.__args.version else '',
+                                              '='.join(self.__args.build) \
+                                                  if self.__args.build else ''),
                                   stdout=sys.stdout,
                                   stderr=sys.stderr)
         else:
@@ -128,11 +130,11 @@ class Client:
                                   '--channel', self.__args.uri,
                                   *self.__channel_common,
                                   'ncrc',
-                                  '%s-opt%s%s' % (self.__args.package,
-                                                  '='.join(self.__args.version) \
-                                                      if self.__args.version else '',
-                                                  '='.join(self.__args.build) \
-                                                      if self.__args.build else ''),
+                                  '%s%s%s' % (self.__args.package,
+                                              '='.join(self.__args.version) \
+                                                  if self.__args.version else '',
+                                              '='.join(self.__args.build) \
+                                                  if self.__args.build else ''),
                                   stdout=sys.stdout,
                                   stderr=sys.stderr)
 
@@ -227,6 +229,7 @@ def verifyArgs(args, parser):
 
     if args.insecure:
         from urllib3.exceptions import InsecureRequestWarning
+        # pylint: not callable
         requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
     args.fqdn = urlparse('rsa://%s' % (args.server)).hostname
