@@ -111,7 +111,10 @@ class Client:
         print('Installing %s...' % (self.__args.application))
         raw_std = conda_api.run_command('info', '--json')[0]
         info = json.loads(raw_std)
-        active_env = os.path.basename(info['active_prefix'])
+        if info['active_prefix'] is not None:
+            active_env = os.path.basename(info['active_prefix'])
+        else:
+            active_env = None
 
         if active_env == self.__args.application:
             conda_api.run_command('install',
