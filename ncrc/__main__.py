@@ -285,9 +285,8 @@ def parseArgs(argv=None):
     parent.add_argument('application', nargs="?", help='The application you wish to work with')
     parent.add_argument('server', nargs="?", default='conda.ncrc-dev.hpc.inl.gov',
                         help='The server containing the conda packages (default: %(default)s)')
-    parent.add_argument('-k', '--insecure', action="store_true", default=False,
-                        help=('Allow untrusted connections. Note: Due to conda channel'
-                              ' limitation, all channels will be untrusted.'))
+    parent.add_argument('-k', '--insecure', action="store_true", default=True,
+                        help=('Allow untrusted connections (temporarily enabled by default)'))
     subparser = parser.add_subparsers(dest='command', help='Available Commands.')
     subparser.required = True
     subparser.add_parser('install', parents=[parent], help='Install application',
