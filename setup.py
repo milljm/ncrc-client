@@ -18,8 +18,8 @@ setup(
     author_email = "m.jason.miller@gmail.com",
     description = "Helper script to facilitate access to secure Conda channels",
     long_description = read("README.md"),
-    license = "LGPL 2.1",
-    keywords = "RSA SecurID Token Conda Channel",
+    license = "BSD-3-Clause",
+    keywords = "RSA SecurID token MFA 2FA channel",
     url = "https://hpcgitlab.hpc.inl.gov/idaholab/ncrc-client",
     classifiers=[
         'Development Status :: 5 - Production/Stable',
@@ -40,6 +40,6 @@ setup(
         ],
     },
     install_requires = [],
-    package_data = {
-    },
+    package_data = {'': ['LICENSE.txt']},
+    include_package_data = True,
 )
