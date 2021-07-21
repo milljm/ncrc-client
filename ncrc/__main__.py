@@ -108,7 +108,7 @@ class Client:
             return
         self.session.cookies.clear()
         try:
-            response = self.session.get('https://%s' % (self.__args.fqdn),
+            response = self.session.get('https://%s/webauthentication' % (self.__args.fqdn),
                                         verify=not self.__args.insecure)
             if response.status_code != 200:
                 print('ERROR connecting to %s' % (self.__args.fqdn))
@@ -231,7 +231,7 @@ class SecureIDAdapter(BaseAdapter):
             null_response.url = request.url
             null_response.request = request
             null_response.status_code = 204
-            self.log.warning('RSA Token expired')
+            self.log.warning('RSA Token expired or channel does not exist')
             return null_response
         return response
 
@@ -269,6 +269,12 @@ def verifyArgs(args, parser):
         parser.print_help(sys.stderr)
         sys.exit(1)
 
+    if (args.command == 'install'
+        and args.package in os.path.basename(os.getenv('CONDA_PREFIX', ''))):
+        print('Cannot install %s while already inside said evironment.' % (args.package),
+              'Use upgrade instead. Or exit the environment first.')
+        sys.exit(1)
+
     if args.insecure:
         from urllib3.exceptions import InsecureRequestWarning
         # pylint: not callable
@@ -283,7 +289,7 @@ def parseArgs(argv=None):
     formatter = lambda prog: argparse.HelpFormatter(prog, max_help_position=22, width=90)
     parent = argparse.ArgumentParser(add_help=False)
     parent.add_argument('application', nargs="?", help='The application you wish to work with')
-    parent.add_argument('server', nargs="?", default='conda.ncrc-dev.hpc.inl.gov',
+    parent.add_argument('server', nargs="?", default='conda.software.inl.gov',
                         help='The server containing the conda packages (default: %(default)s)')
     parent.add_argument('-k', '--insecure', action="store_true", default=True,
                         help=('Allow untrusted connections (temporarily enabled by default)'))
