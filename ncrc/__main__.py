@@ -274,13 +274,13 @@ def verifyArgs(args, parser):
         sys.exit(1)
 
     if (args.command == 'install'
-        and args.application in os.path.basename(os.getenv('CONDA_PREFIX', ''))):
+    and args.application in os.path.basename(os.getenv('CONDA_PREFIX', ''))):
         print('Cannot install %s while already inside said evironment.' % (args.package),
               'Use upgrade instead. Or exit the environment first.')
         sys.exit(1)
 
     if (args.command == 'update'
-        and args.application not in os.path.basename(os.getenv('CONDA_PREFIX', ''))):
+    and args.application not in os.path.basename(os.getenv('CONDA_PREFIX', ''))):
         print(' Cannot update %s while not inside said evironment.\n' % (args.application),
               'Please enter the environment first and then run command again.',
               '\n\tconda activate %s' % (args.application))
