@@ -252,8 +252,9 @@ def getCookie(fqdn):
 
 def verifyArgs(args, parser):
     if not args.application:
-        print('You must supply an NCRC Application to update')
+        print('You must supply an NCRC Application')
         sys.exit(1)
+    args.application = args.application.replace('ncrc-', '')
     if len(args.application.split('=')) > 2:
         (args.package, args.version, args.build) = args.application.split('=')
     elif len(args.application.split('=')) > 1:
@@ -264,15 +265,25 @@ def verifyArgs(args, parser):
         args.build = None
         args.version = None
 
+    # prefix package with 'ncrc-'
+    args.package = 'ncrc-%s' % (args.package.replace('ncrc-', ''))
+
     if not args.server:
         print('You must specify a server containing Conda packages')
         parser.print_help(sys.stderr)
         sys.exit(1)
 
     if (args.command == 'install'
-        and args.package in os.path.basename(os.getenv('CONDA_PREFIX', ''))):
+        and args.application in os.path.basename(os.getenv('CONDA_PREFIX', ''))):
         print('Cannot install %s while already inside said evironment.' % (args.package),
               'Use upgrade instead. Or exit the environment first.')
+        sys.exit(1)
+
+    if (args.command == 'update'
+        and args.application not in os.path.basename(os.getenv('CONDA_PREFIX', ''))):
+        print(' Cannot update %s while not inside said evironment.\n' % (args.application),
+              'Please enter the environment first and then run command again.',
+              '\n\tconda activate %s' % (args.application))
         sys.exit(1)
 
     if args.insecure:
@@ -297,6 +308,9 @@ def parseArgs(argv=None):
     subparser.required = True
     subparser.add_parser('install', parents=[parent], help='Install application',
                          formatter_class=formatter)
+    subparser.add_parser('remove', parents=[parent],
+                         help=('Prints information on how to remove application'),
+                         formatter_class=formatter)
     subparser.add_parser('update', parents=[parent], help='Update application',
                          formatter_class=formatter)
     subparser.add_parser('search', parents=[parent], help='Search for application',
@@ -313,6 +327,11 @@ def main(argv=None):
         ncrc = Client(args)
         if args.command == 'install':
             ncrc.install()
+        elif args.command == 'remove':
+            print(' Due to the way ncrc wraps itself into conda commands, it is best to\n',
+                  'remove the environment in which the application is installed. Begin\n',
+                  'by deactivating the application environment and then remove it:',
+                  '\n\tconda deactivate\n\tconda env remove -n %s' % (args.application))
         elif args.command == 'update':
             ncrc.update()
         elif args.command == 'search':
