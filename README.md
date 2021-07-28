@@ -46,7 +46,7 @@ You agree your contributions are submitted under the BSD 3-Clause license. You r
 
 # NCRC Client
 
-The NCRC client allows users to search, install, and upgrade Conda packages contained behind an RSA protected server. All packages are prefixed with "inl-" so as not to be confused with non-INL like-named Conda packages from other channels.
+The NCRC client allows users to search, install, and upgrade Conda packages contained behind an RSA protected server. Technically, on the server-side, the packages produced for use by this tool must establish a certain prefix ('ncrc-' in this case). The end-user however need not worry about any prefix semantics. The NCRC client will handle whether or not users supply or not supply a prefix.
 
 ## Install NCRC
 
@@ -54,35 +54,36 @@ The NCRC client is available via INL's public Conda channel repository or from t
 
 INL Conda Repository:
 ```bash
-conda config --add https://conda.software.inl.gov/public
-conda install ncrc
+$> conda config --add https://conda.software.inl.gov/public
+$> conda install ncrc
 ```
 
 Anaconda (will become deprecated):
 ```bash
-conda config --add channels idaholab
-conda install ncrc
+$> conda config --add channels idaholab
+$> conda install ncrc
 ```
 
 You can also install NCRC from source:
 
 ```bash
-git clone https://hpcgitlab.hpc.inl.gov/idaholab/ncrc-client
-cd ncrc-client
-pip install .
+$> git clone https://hpcgitlab.hpc.inl.gov/idaholab/ncrc-client
+$> cd ncrc-client
+$> pip install .
 ```
 
 ## NCRC Syntax
 
 ```pre
-usage: ncrc [-h] {install,update,search} ...
+usage: ncrc [-h] {install,remove,update,search} ...
 
 Manage NCRC packages
 
 positional arguments:
-  {install,update,search}
+  {install,remove,update,search}
                         Available Commands.
     install             Install application
+    remove              Prints information on how to remove application
     update              Update application
     search              Search for application
 
@@ -93,25 +94,35 @@ optional arguments:
 ## NCRC Usage Examples
 
 ```bash
-$> ncrc search inl-bison
+$> ncrc search bison
 
 Username: johndoe
 PIN+TOKEN:
 Loading channels: done
 # Name                       Version           Build  Channel
-inl-bison                 2021_07_07         build_0  inl-bison
-inl-bison                 2021_07_08         build_0  inl-bison
-inl-bison                 2021_07_09         build_0  inl-bison
+ncrc-bison                2021_07_28         build_0  ncrc-bison
 ```
 Lists all available versions of Bison
 
 ```bash
-ncrc install inl-bison
-ncrc install inl-bison=2021_07_11
+$> ncrc install bison
+$> ncrc install bison=2021_07_27
 ```
 Install the latest version of Bison, or a specific version thereof.
 
 ```bash
-ncrc update inl-bison
+$> conda activate bison
+$> ncrc update bison
 ```
 Updates Bison (and everything else that may require an update).
+
+
+```bash
+$> ncrc remove bison
+ Due to the way ncrc wraps itself into conda commands, it is best to
+ remove the environment in which the application is installed. Begin
+ by deactivating the application environment and then remove it:
+	conda deactivate
+	conda env remove -n bison
+```
+The NCRC script being a wrapper tool, is unable to perform such a function. The user must deactivate the environment and remove that environment instead if they wish to remove said application.
