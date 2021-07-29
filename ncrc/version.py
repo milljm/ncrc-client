@@ -1,1 +1,1 @@
-version_str = "1.7"
+version_str = "1.8"

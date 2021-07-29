@@ -67,10 +67,11 @@ class Client:
     def __init__(self, args):
         self.session = requests.Session()
         self.__args = args
-        self.__channel_common = ['--channel', 'idaholab',
+        self.__channel_common = ['--channel', 'https://conda.software.inl.gov/public',
                                  '--channel', 'conda-forge',
-                                 '--strict-channel-priority',
-                                 '%s' % ('--insecure' if self.__args.insecure else '')]
+                                 '--strict-channel-priority']
+        if self.__args.insecure:
+            self.__channel_common.append('--insecure')
 
     def _saveCookie(self):
         cookie_file = '%s' % (os.path.sep).join([os.path.expanduser("~"),
@@ -192,10 +193,10 @@ class Client:
 
     def search(self):
         self._createSecureConnection()
-        conda_api.run_command('search',
-                              '--override-channels',
-                              '--channel', self.__args.uri,
-                              '%s' % ('--insecure' if self.__args.insecure else ''),
+        run_command = ['search', '--override-channels', '--channel', self.__args.uri]
+        if self.__args.insecure:
+            run_command.append('--insecure')
+        conda_api.run_command(*run_command,
                               stdout=sys.stdout,
                               stderr=sys.stderr)
 
@@ -213,7 +214,7 @@ class SecureIDAdapter(BaseAdapter):
         response = session.get(request.url,
                                stream=stream,
                                timeout=1,
-                               verify=False,
+                               verify=verify,
                                cert=cert,
                                proxies=proxies)
         response.request = request
@@ -302,8 +303,8 @@ def parseArgs(argv=None):
     parent.add_argument('application', nargs="?", help='The application you wish to work with')
     parent.add_argument('server', nargs="?", default='conda.software.inl.gov',
                         help='The server containing the conda packages (default: %(default)s)')
-    parent.add_argument('-k', '--insecure', action="store_true", default=True,
-                        help=('Allow untrusted connections (temporarily enabled by default)'))
+    parent.add_argument('-k', '--insecure', action="store_true", default=False,
+                        help=('Allow untrusted connections'))
     subparser = parser.add_subparsers(dest='command', help='Available Commands.')
     subparser.required = True
     subparser.add_parser('install', parents=[parent], help='Install application',
