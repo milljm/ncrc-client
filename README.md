@@ -50,16 +50,18 @@ The NCRC client allows users to search, install, and upgrade Conda packages cont
 
 ## Install NCRC
 
-The NCRC client is available via INL's public Conda channel repository or from the Anaconda Idaholab channel:
+The NCRC client is available via INL's public Conda channel repository or from the Anaconda Idaholab channel. The client must be installed into the base environment.
 
 INL Conda Repository:
 ```bash
-$> conda config --add https://conda.software.inl.gov/public
+$> conda deactivate
+$> conda config --add channels https://conda.software.inl.gov/public
 $> conda install ncrc
 ```
 
 Anaconda (will become deprecated):
 ```bash
+$> conda deactivate
 $> conda config --add channels idaholab
 $> conda install ncrc
 ```
@@ -101,12 +103,15 @@ PIN+TOKEN:
 Loading channels: done
 # Name                       Version           Build  Channel
 ncrc-bison                2021_07_28         build_0  ncrc-bison
+ncrc-bison                2021_08_08         build_0  ncrc-bison
+ncrc-bison                2021_08_13         build_0  ncrc-bison
 ```
 Lists all available versions of Bison
 
 ```bash
+$> conda deactivate
 $> ncrc install bison
-$> ncrc install bison=2021_07_27
+$> ncrc install bison=2021_07_28
 ```
 Install the latest version of Bison, or a specific version thereof.
 
