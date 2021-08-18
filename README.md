@@ -54,14 +54,14 @@ The NCRC client is available via INL's public Conda channel repository or from t
 
 INL Conda Repository:
 ```bash
-$> conda deactivate
+$> conda activate base
 $> conda config --add channels https://conda.software.inl.gov/public
 $> conda install ncrc
 ```
 
 Anaconda (will become deprecated):
 ```bash
-$> conda deactivate
+$> conda activate base
 $> conda config --add channels idaholab
 $> conda install ncrc
 ```
@@ -109,7 +109,7 @@ ncrc-bison                2021_08_13         build_0  ncrc-bison
 Lists all available versions of Bison
 
 ```bash
-$> conda deactivate
+$> conda activate base
 $> ncrc install bison
 $> ncrc install bison=2021_07_28
 ```
