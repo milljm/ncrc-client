@@ -275,7 +275,7 @@ def verifyArgs(args, parser):
         sys.exit(1)
 
     if (args.command == 'install'
-        and ('base' not in os.getenv('CONDA_DEFAULT_ENV', ''))):
+            and ('base' not in os.getenv('CONDA_DEFAULT_ENV', ''))):
         print(' Cannot install %s while already inside an evironment.\n' % (args.application),
               'Enter the base environment first with `conda activate base`.')
         sys.exit(1)
