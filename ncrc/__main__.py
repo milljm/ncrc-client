@@ -152,14 +152,12 @@ class Client:
         variant = list(filter(None, [self.__args.package,
                                      self.__args.version,
                                      self.__args.build]))
-        env_name = '_'.join(variant)
-        pkg_install = '='.join(variant)
         conda_api.run_command('create',
-                              '--name', name,
+                              '--name', '_'.join(variant),
                               '--channel', self.__args.uri,
                               *self.__channel_common,
                               'ncrc',
-                              install,
+                              '='.join(variant),
                               stdout=sys.stdout,
                               stderr=sys.stderr)
 
