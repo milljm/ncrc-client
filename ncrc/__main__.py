@@ -44,7 +44,6 @@ import getpass
 import argparse
 import re
 import pickle
-import json
 import errno
 from urllib.parse import urlparse
 from unittest import mock
