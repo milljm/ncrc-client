@@ -192,13 +192,19 @@ class Client:
                               stderr=sys.stderr)
 
     def search(self):
-        self._createSecureConnection()
-        run_command = ['search', '--override-channels', '--channel', self.__args.uri]
+        run_command = ['search',
+                       '--override-channels',
+                       '--channel',
+                       self.__args.uri,
+                       self.__args.package]
         if self.__args.insecure:
             run_command.append('--insecure')
-        conda_api.run_command(*run_command,
-                              stdout=sys.stdout,
-                              stderr=sys.stderr)
+        try:
+            conda_api.run_command(*run_command,
+                                  stdout=sys.stdout,
+                                  stderr=sys.stderr)
+        except:
+            pass
 
 class SecureIDAdapter(BaseAdapter):
     def __init__(self, *args, **kwargs):
@@ -293,7 +299,10 @@ def verifyArgs(args, parser):
         requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
     args.fqdn = urlparse('rsa://%s' % (args.server)).hostname
-    args.uri = 'rsa://%s/%s' % (args.server, args.package)
+    if args.command == 'search':
+        args.uri = 'https://%s/ncrc-applications' % (args.server)
+    else:
+        args.uri = 'rsa://%s/%s' % (args.server, args.package)
     return args
 
 def parseArgs(argv=None):
