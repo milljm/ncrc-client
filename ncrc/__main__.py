@@ -203,7 +203,7 @@ class Client:
             conda_api.run_command(*run_command,
                                   stdout=sys.stdout,
                                   stderr=sys.stderr)
-        except:
+        except: # pylint: disable=bare-except
             pass
 
 class SecureIDAdapter(BaseAdapter):
