@@ -258,7 +258,7 @@ def getCookie(fqdn):
     return cookie
 
 def verifyArgs(args, parser):
-    if not args.application:
+    if not args.application and not args.command == 'search':
         print('You must supply an NCRC Application')
         sys.exit(1)
     args.application = args.application.replace('ncrc-', '')
@@ -309,7 +309,8 @@ def parseArgs(argv=None):
     parser = argparse.ArgumentParser(description='Manage NCRC packages')
     formatter = lambda prog: argparse.HelpFormatter(prog, max_help_position=22, width=90)
     parent = argparse.ArgumentParser(add_help=False)
-    parent.add_argument('application', nargs="?", help='The application you wish to work with')
+    parent.add_argument('application', nargs="?", default='',
+                        help='The application you wish to work with')
     parent.add_argument('server', nargs="?", default='conda.software.inl.gov',
                         help='The server containing the conda packages (default: %(default)s)')
     parent.add_argument('-k', '--insecure', action="store_true", default=False,
