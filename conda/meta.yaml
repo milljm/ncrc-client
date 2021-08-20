@@ -38,12 +38,12 @@ test:
     - ncrc list
 
 about:
-  home: https://hpcgitlab.hpc.inl.gov/idaholab/ncrc-client
+  home: https://github.com/idaholab/ncrc-client
   license: BSD-3-Clause
   license_file: LICENSE.txt
   summary: Install Conda packages protected by an RSASecurID location
-  doc_url: https://hpcgitlab.hpc.inl.gov/idaholab/ncrc-client
-  dev_url: https://hpcgitlab.hpc.inl.gov/idaholab/ncrc-client
+  doc_url: https://github.com/idaholab/ncrc-client
+  dev_url: https://github.com/idaholab/ncrc-client
 
 extra:
   recipe-maintainers:
