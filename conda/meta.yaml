@@ -1,7 +1,7 @@
 {% set build = 0 %}
 {% set strbuild = "build_" + build|string %}
 {% set name = "ncrc" %}
-{% set version = "1.12" %}
+{% set version = "1.13" %}
 
 package:
   name: {{ name }}
@@ -34,7 +34,7 @@ test:
     - ncrc
   commands:
     - ncrc --help
-    - ncrc search
+    - ncrc search bison
     - ncrc list
 
 about:

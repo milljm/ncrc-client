@@ -51,7 +51,6 @@ from io import StringIO
 import logging
 import requests
 import urllib3
-# pylint: not callable
 logging.getLogger(requests.packages.urllib3.__package__).setLevel(logging.ERROR)
 
 try:
@@ -187,7 +186,7 @@ class Client:
 
 class SecureIDAdapter(BaseAdapter):
     def __init__(self, *args, **kwargs):
-        super(SecureIDAdapter, self).__init__()
+        super().__init__()
         self.log = logging.getLogger(__name__)
 
     def send(self, request, stream=None, timeout=None, verify=None, cert=None, proxies=None):
@@ -237,10 +236,14 @@ def getCookie(fqdn):
     return cookie
 
 def verifyArgs(args, parser):
-    if not args.application and not (args.command == 'search' or args.command == 'list'):
-        print('You must supply an NCRC Application')
+    if not args.application and args.command not in ['update', 'list']:
+        print('You must supply additional information when performing this action')
         sys.exit(1)
-    args.application = args.application.replace('ncrc-', '')
+    conda_environment = os.getenv('CONDA_DEFAULT_ENV', '')
+    ncrc_app = None
+    if args.prefix in conda_environment:
+        ncrc_app = conda_environment.split('_')[0]
+
     if len(args.application.split('=')) > 2:
         (args.package, args.version, args.build) = args.application.split('=')
     elif len(args.application.split('=')) > 1:
@@ -251,34 +254,33 @@ def verifyArgs(args, parser):
         args.build = None
         args.version = None
 
-    # prefix package with 'ncrc-'
-    args.package = 'ncrc-%s' % (args.package.replace('ncrc-', ''))
+    if ncrc_app and args.package == '':
+        args.package = ncrc_app
 
-    if not args.server:
-        print('You must specify a server containing Conda packages')
-        parser.print_help(sys.stderr)
-        sys.exit(1)
-
-    if (args.command == 'install'
-            and ('base' not in os.getenv('CONDA_DEFAULT_ENV', ''))):
-        print(' Cannot install %s while already inside an evironment.\n' % (args.application),
+    args.package = '%s%s' % (args.prefix, args.package.replace(args.prefix, ''))
+    if (args.command == 'install' and conda_environment != 'base'):
+        print(' Cannot install %s while not inside the base evironment.\n' % (args.package),
               'Enter the base environment first with `conda activate base`.')
         sys.exit(1)
 
-    if (args.command == 'update'
-            and args.application not in os.path.basename(os.getenv('CONDA_PREFIX', ''))):
-        print(' Cannot update %s while not inside said evironment.\n' % (args.application),
-              'Please enter the environment first and then run the command again:\n',
-              '\n\tconda activate %s\n\tncrc update %s' % (args.application, args.application))
+    if (args.command == 'update' and ncrc_app is None):
+        print(' Cannot perform an update while not inside said evironment. Please\n',
+              'activate the environment first and then run the command again. Use:\n',
+              '\n\tconda env list\n\nTo view available environments to activate.')
+        sys.exit(1)
+    elif (args.command == 'update' and ncrc_app and len(conda_environment) > 1):
+        print(' You installed a specific version of %s.' % (ncrc_app), 'If you wish\n',
+              'to update to the lastest version, it would be best to install\n',
+              'it into a new environment instead:\n\n\tconda activate base\n\tncrc install',
+              '%s\n\n or activate that environment and perform the update there.' % (ncrc_app))
         sys.exit(1)
 
     if args.insecure:
         from urllib3.exceptions import InsecureRequestWarning
-        # pylint: not callable
         requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
     args.fqdn = urlparse('rsa://%s' % (args.server)).hostname
-    if args.command == 'search' or args.command == 'list':
+    if args.command in ['search', 'list']:
         args.uri = 'https://%s/ncrc-applications' % (args.server)
     else:
         args.uri = 'rsa://%s/%s' % (args.server, args.package)
@@ -310,6 +312,10 @@ def parseArgs(argv=None):
                          help=('List all available NCRC applications'),
                          formatter_class=formatter)
     args = parser.parse_args(argv)
+
+    # Set the prefix for all apps. Perhaps someday this will be made into an argument (support
+    # different application branding)
+    args.prefix = 'ncrc-'
     return verifyArgs(args, parser)
 
 def main(argv=None):
@@ -328,7 +334,7 @@ def main(argv=None):
                   '\n\tconda deactivate\n\tconda env remove -n %s' % (args.application))
         elif args.command == 'update':
             ncrc.update()
-        elif args.command == 'search' or args.command == 'list':
+        elif args.command in ['search', 'list']:
             ncrc.search()
 
 if __name__ == '__main__':
