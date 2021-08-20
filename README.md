@@ -69,7 +69,7 @@ $> conda install ncrc
 You can also install NCRC from source:
 
 ```bash
-$> git clone https://hpcgitlab.hpc.inl.gov/idaholab/ncrc-client
+$> git clone https://github.com/idaholab/ncrc-client
 $> cd ncrc-client
 $> pip install .
 ```
