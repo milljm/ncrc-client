@@ -122,7 +122,7 @@ $> conda activate base
 $> ncrc install bison
 Username: johndoe
 PIN+TOKEN: 
-Installing bison=2021_08_08...
+Installing bison...
 
 
 $> conda activate base
