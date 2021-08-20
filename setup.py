@@ -15,12 +15,12 @@ setup(
     version = version_str,
 
     author = "Jason Miller",
-    author_email = "m.jason.miller@gmail.com",
+    author_email = "jason.miller@inl.gov",
     description = "Helper script to facilitate access to secure Conda channels",
     long_description = read("README.md"),
     license = "BSD-3-Clause",
     keywords = "RSA SecurID token MFA 2FA channel",
-    url = "https://hpcgitlab.hpc.inl.gov/idaholab/ncrc-client",
+    url = "https://github.com/idaholab/ncrc-client",
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Programming Language :: Python',
