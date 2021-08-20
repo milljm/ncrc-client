@@ -44,7 +44,6 @@ import getpass
 import argparse
 import re
 import pickle
-import json
 import errno
 from urllib.parse import urlparse
 from unittest import mock
@@ -149,37 +148,17 @@ class Client:
     def install(self):
         self._createSecureConnection()
         print('Installing %s...' % (self.__args.application))
-        raw_std = conda_api.run_command('info', '--json')[0]
-        info = json.loads(raw_std)
-        if info['active_prefix'] is not None:
-            active_env = os.path.basename(info['active_prefix'])
-        else:
-            active_env = None
-
-        if active_env == self.__args.application:
-            conda_api.run_command('install',
-                                  '--channel', self.__args.uri,
-                                  *self.__channel_common,
-                                  '%s%s%s' % (self.__args.package,
-                                              '='.join(self.__args.version) \
-                                                  if self.__args.version else '',
-                                              '='.join(self.__args.build) \
-                                                  if self.__args.build else ''),
-                                  stdout=sys.stdout,
-                                  stderr=sys.stderr)
-        else:
-            conda_api.run_command('create',
-                                  '--name', self.__args.application,
-                                  '--channel', self.__args.uri,
-                                  *self.__channel_common,
-                                  'ncrc',
-                                  '%s%s%s' % (self.__args.package,
-                                              '='.join(self.__args.version) \
-                                                  if self.__args.version else '',
-                                              '='.join(self.__args.build) \
-                                                  if self.__args.build else ''),
-                                  stdout=sys.stdout,
-                                  stderr=sys.stderr)
+        variant = list(filter(None, [self.__args.package,
+                                     self.__args.version,
+                                     self.__args.build]))
+        conda_api.run_command('create',
+                              '--name', '_'.join(variant),
+                              '--channel', self.__args.uri,
+                              *self.__channel_common,
+                              'ncrc',
+                              '='.join(variant),
+                              stdout=sys.stdout,
+                              stderr=sys.stderr)
 
     def update(self):
         self._createSecureConnection()
@@ -258,7 +237,7 @@ def getCookie(fqdn):
     return cookie
 
 def verifyArgs(args, parser):
-    if not args.application and not args.command == 'search':
+    if not args.application and not (args.command == 'search' or args.command == 'list'):
         print('You must supply an NCRC Application')
         sys.exit(1)
     args.application = args.application.replace('ncrc-', '')
@@ -299,7 +278,7 @@ def verifyArgs(args, parser):
         requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
     args.fqdn = urlparse('rsa://%s' % (args.server)).hostname
-    if args.command == 'search':
+    if args.command == 'search' or args.command == 'list':
         args.uri = 'https://%s/ncrc-applications' % (args.server)
     else:
         args.uri = 'rsa://%s/%s' % (args.server, args.package)
@@ -324,7 +303,11 @@ def parseArgs(argv=None):
                          formatter_class=formatter)
     subparser.add_parser('update', parents=[parent], help='Update application',
                          formatter_class=formatter)
-    subparser.add_parser('search', parents=[parent], help='Search for application',
+    subparser.add_parser('search', parents=[parent],
+                         help=('Perform a regular expression search for NCRC application'),
+                         formatter_class=formatter)
+    subparser.add_parser('list', parents=[parent],
+                         help=('List all available NCRC applications'),
                          formatter_class=formatter)
     args = parser.parse_args(argv)
     return verifyArgs(args, parser)
@@ -345,7 +328,7 @@ def main(argv=None):
                   '\n\tconda deactivate\n\tconda env remove -n %s' % (args.application))
         elif args.command == 'update':
             ncrc.update()
-        elif args.command == 'search':
+        elif args.command == 'search' or args.command == 'list':
             ncrc.search()
 
 if __name__ == '__main__':
