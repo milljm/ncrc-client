@@ -34,7 +34,7 @@ test:
     - ncrc
   commands:
     - ncrc --help
-    - ncrc search
+    - ncrc search bison
     - ncrc list
 
 about:
