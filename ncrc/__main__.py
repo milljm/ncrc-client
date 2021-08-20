@@ -307,7 +307,7 @@ def parseArgs(argv=None):
                          help=('Perform a regular expression search for NCRC application'),
                          formatter_class=formatter)
     subparser.add_parser('list', parents=[parent],
-                         help=('List all available NCRC applications for download'),
+                         help=('List all available NCRC applications'),
                          formatter_class=formatter)
     args = parser.parse_args(argv)
     return verifyArgs(args, parser)

@@ -77,17 +77,19 @@ $> pip install .
 ## NCRC Syntax
 
 ```pre
-usage: ncrc [-h] {install,remove,update,search} ...
+usage: ncrc [-h] {install,remove,update,search,list} ...
 
 Manage NCRC packages
 
 positional arguments:
-  {install,remove,update,search}
+  {install,remove,update,search,list}
                         Available Commands.
     install             Install application
     remove              Prints information on how to remove application
     update              Update application
-    search              Search for application
+    search              Perform a regular expression search for an NCRC
+                        application
+    list                List all available NCRC applications
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -96,31 +98,46 @@ optional arguments:
 ## NCRC Usage Examples
 
 ```bash
-$> ncrc search bison
+$> ncrc list
+Loading channels: done
+No match found for: ncrc-. Search: *ncrc-*
+# Name                       Version           Build  Channel
+ncrc-bison                2021_07_28         build_0  ncrc-applications
+ncrc-bison                2021_08_08         build_0  ncrc-applications
+ncrc-bison                2021_08_13         build_0  ncrc-applications
+ncrc-griffin              2021_07_29         build_0  ncrc-applications
+```
+List all available NCRC applications
 
-Username: johndoe
-PIN+TOKEN:
+```bash
+$> ncrc search griffin
 Loading channels: done
 # Name                       Version           Build  Channel
-ncrc-bison                2021_07_28         build_0  ncrc-bison
-ncrc-bison                2021_08_08         build_0  ncrc-bison
-ncrc-bison                2021_08_13         build_0  ncrc-bison
+ncrc-griffin              2021_07_29         build_0  ncrc-applications
 ```
-Lists all available versions of Bison
+Lists all available versions of griffin
 
 ```bash
 $> conda activate base
 $> ncrc install bison
+Username: johndoe
+PIN+TOKEN: 
+Installing bison=2021_08_08...
+
+
+$> conda activate base
 $> ncrc install bison=2021_07_28
+Username: johndoe
+PIN+TOKEN: 
+Installing bison=2021_07_28...
 ```
-Install the latest version of Bison, or a specific version thereof.
+Install the latest version of Bison (default Conda behavior), or a specific version thereof.
 
 ```bash
 $> conda activate bison
 $> ncrc update bison
 ```
 Updates Bison (and everything else that may require an update).
-
 
 ```bash
 $> ncrc remove bison
@@ -130,4 +147,4 @@ $> ncrc remove bison
 	conda deactivate
 	conda env remove -n bison
 ```
-The NCRC script being a wrapper tool, is unable to perform such a function. The user must deactivate the environment and remove that environment instead if they wish to remove said application.
+The NCRC script being a wrapper tool, is unable to perform such a function. The user must deactivate the environment and remove that environment using the appropraite conda commands.
