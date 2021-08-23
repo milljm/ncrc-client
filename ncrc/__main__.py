@@ -147,15 +147,18 @@ class Client:
     def install(self):
         self._createSecureConnection()
         print('Installing %s...' % (self.__args.application))
-        variant = list(filter(None, [self.__args.package,
-                                     self.__args.version,
-                                     self.__args.build]))
+        pkg_variant = list(filter(None, [self.__args.package,
+                                         self.__args.version,
+                                         self.__args.build]))
+        name_variant = list(filter(None, [self.__args.application,
+                                          self.__args.version,
+                                          self.__args.build]))
         conda_api.run_command('create',
-                              '--name', '_'.join(variant),
+                              '--name', '_'.join(name_variant),
                               '--channel', self.__args.uri,
                               *self.__channel_common,
                               'ncrc',
-                              '='.join(variant),
+                              '='.join(pkg_variant),
                               stdout=sys.stdout,
                               stderr=sys.stderr)
 
@@ -257,7 +260,11 @@ def verifyArgs(args, parser):
     if ncrc_app and args.package == '':
         args.package = ncrc_app
 
-    args.package = '%s%s' % (args.prefix, args.package.replace(args.prefix, ''))
+    # format package name (strip special characters, make lower case, prefix/brand it)
+    args.application = '%s' % (args.package.replace(args.prefix, ''))
+    args.package = '%s' % (args.package.replace(args.prefix, ''))
+    args.package = '%s' % (''.join(e for e in args.package if e.isalnum()))
+    args.package = '%s%s' % (args.prefix, args.package.lower())
     if (args.command == 'install' and conda_environment != 'base'):
         print(' Cannot install %s while not inside the base evironment.\n' % (args.package),
               'Enter the base environment first with `conda activate base`.')
