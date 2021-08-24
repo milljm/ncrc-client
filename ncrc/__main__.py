@@ -246,6 +246,8 @@ def verifyArgs(args, parser):
     ncrc_app = None
     if args.prefix in conda_environment:
         ncrc_app = conda_environment.split('_')[0]
+    elif os.getenv('NCRC_APP', ''):
+        ncrc_app = os.getenv('NCRC_APP', '').lower()
 
     if len(args.application.split('=')) > 2:
         (args.package, args.version, args.build) = args.application.split('=')
@@ -275,7 +277,7 @@ def verifyArgs(args, parser):
               'activate the environment first and then run the command again. Use:\n',
               '\n\tconda env list\n\nTo view available environments to activate.')
         sys.exit(1)
-    elif (args.command == 'update' and ncrc_app and len(conda_environment) > 1):
+    elif (args.command == 'update' and ncrc_app and len(conda_environment.split('_')) > 1):
         print(' You installed a specific version of %s.' % (ncrc_app), 'If you wish\n',
               'to update to the lastest version, it would be best to install\n',
               'it into a new environment instead:\n\n\tconda activate base\n\tncrc install',
