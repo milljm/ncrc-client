@@ -187,7 +187,7 @@ class Client:
                 app_list = ['\t' + x.split()[0].replace('ncrc-', '')
                             for x in std_out[0].split('\n')[3:-1:]]
                 unique_apps = '\n'.join(set(app_list))
-                print('# Use \'ncrc search app\' to list more detail\n# NCRC',
+                print('# Use \'ncrc search name-of-application\' to list more detail\n# NCRC',
                       'applications available:\n\n%s' % (unique_apps))
             else:
                 conda_api.run_command(*run_command,
