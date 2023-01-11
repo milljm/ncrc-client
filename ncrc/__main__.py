@@ -66,8 +66,8 @@ class Client:
         self.session = requests.Session()
         self.__args = args
         self.__channel_common = ['--channel', 'https://conda.software.inl.gov/public',
-                                 '--channel', 'conda-forge',
-                                 '--strict-channel-priority']
+                                 '--channel', 'https://conda.software.inl.gov/archive',
+                                 '--channel', 'conda-forge']
         if self.__args.insecure:
             self.__channel_common.append('--insecure')
 
@@ -156,6 +156,7 @@ class Client:
         conda_api.run_command('create',
                               '--name', '_'.join(name_variant),
                               '--channel', self.__args.uri,
+                              '--channel', f'{self.__args.uri}_archive',
                               *self.__channel_common,
                               'ncrc',
                               '='.join(pkg_variant),
@@ -168,6 +169,7 @@ class Client:
         conda_api.run_command('update',
                               '--all',
                               '--channel', self.__args.uri,
+                              '--channel', f'{self.__args.uri}_archive',
                               *self.__channel_common,
                               stdout=sys.stdout,
                               stderr=sys.stderr)
