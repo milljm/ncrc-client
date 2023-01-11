@@ -14,7 +14,7 @@ build:
   number: {{ build }}
   string: {{ strbuild }}
   noarch: python
-  script: {{ PYTHON }} -m pip install . --no-deps -vv --upgrade-strategy only-if-needed --use-feature=in-tree-build
+  script: {{ PYTHON }} -m pip install . --no-deps -vv --upgrade-strategy only-if-needed
   entry_points:
     - ncrc = ncrc.__main__:main
 
