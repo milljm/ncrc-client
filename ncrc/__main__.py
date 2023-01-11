@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+""" Allow connections to RSA protected Conda Channels """
 #BSD 3-clause license
 #  Copyright (c) 2015-2021, conda-forge contributors
 #  All rights reserved.
@@ -51,9 +52,13 @@ from io import StringIO
 import logging
 import requests
 import urllib3
+from urllib3.exceptions import InsecureRequestWarning
+
+#pylint: disable=no-member
 logging.getLogger(requests.packages.urllib3.__package__).setLevel(logging.ERROR)
 
 try:
+    import conda # Determin version
     import conda.cli.python_api as conda_api
     from conda.gateways.connection.session import CondaSession
     from conda.gateways.connection import BaseAdapter
@@ -62,29 +67,45 @@ except ImportError:
     sys.exit(1)
 
 class Client:
+    """ NCRC Client class responsible for creating the connection using Conda API """
+
     def __init__(self, args):
         self.session = requests.Session()
         self.__args = args
+        self.__required_version = ['22', '11', '0']
         self.__channel_common = ['--channel', 'https://conda.software.inl.gov/public',
                                  '--channel', 'https://conda.software.inl.gov/archive',
                                  '--channel', 'conda-forge']
         if self.__args.insecure:
             self.__channel_common.append('--insecure')
 
-    def _saveCookie(self):
-        cookie_file = '%s' % (os.path.sep).join([os.path.expanduser("~"),
-                                                 '.RSASecureID_login',
-                                                 self.__args.fqdn])
+    def check_condaversion(self):
+        """ Verify we are using an up to date Conda """
+        for k_iter, value in enumerate(conda.__version__.split(".")):
+            if int(value) < int(self.__required_version[k_iter]):
+                print((f'\nConda out of date:\t{conda.__version__}\n'
+                       f'Required version:\t{".".join(self.__required_version)}\n'
+                        'Please update Conda:\n\n\t`conda update conda`\n'))
+                sys.exit(1)
+
+    def save_cookie(self):
+        """ Save the request object's cookie for additional connections """
+        cookie_file = os.path.sep.join([os.path.expanduser("~"),
+                                        ".RSASecureID_login",
+                                        self.__args.fqdn])
+
         if not os.path.exists(os.path.dirname(cookie_file)):
             try:
                 os.makedirs(os.path.dirname(cookie_file))
-            except OSError as e:
-                if e.errno != errno.EEXIST:
+            except OSError as error_o:
+                if error_o.errno != errno.EEXIST:
                     raise
-        with open(cookie_file, 'wb') as f:
-            pickle.dump(self.session.cookies, f)
+        with open(cookie_file, 'wb') as file_o:
+            pickle.dump(self.session.cookies, file_o)
 
-    def _getCredentials(self):
+    @staticmethod
+    def get_credentials():
+        """ Get credentials from command line user input """
         try:
             username = input('Username: ')
             passcode = getpass.getpass('PIN+TOKEN: ')
@@ -92,48 +113,50 @@ class Client:
             sys.exit(1)
         return (username, passcode)
 
-    def _connectionExists(self):
-        cookie = getCookie(self.__args.fqdn)
+    def connection_exists(self):
+        """ Check if connection exists, and if we can use existing cookie """
+        cookie = get_cookie(self.__args.fqdn)
         self.session.cookies.update(cookie)
-        response = self.session.get('https://%s/%s/channeldata.json' % (self.__args.fqdn,
-                                                                        self.__args.package),
-                                    verify=not self.__args.insecure)
+        response = self.session.get((f'https://{self.__args.fqdn}/{self.__args.package}/'
+                                      'channeldata.json'), verify=not self.__args.insecure)
+
         if response.status_code == 200 and 'application' in response.headers['Content-Type']:
             return True
         return False
 
-    def _createSecureConnection(self):
-        if self._connectionExists():
+    def create_connection(self):
+        """ Create connection using requests """
+        if self.connection_exists():
             return
         self.session.cookies.clear()
         try:
-            response = self.session.get('https://%s/webauthentication' % (self.__args.fqdn),
+            response = self.session.get(f'https://{self.__args.fqdn}/webauthentication',
                                         verify=not self.__args.insecure)
             if response.status_code != 200:
-                print('ERROR connecting to %s' % (self.__args.fqdn))
+                print(f'ERROR connecting to {self.__args.fqdn}')
                 sys.exit(1)
             token = re.findall(r'name="csrftoken" value="(\w+)', response.text)
-            (username, passcode) = self._getCredentials()
-            response = self.session.post('https://%s/webauthentication' % (self.__args.fqdn),
+            (username, passcode) = self.get_credentials()
+            response = self.session.post(f'https://{self.__args.fqdn}/webauthentication',
                                          verify=not self.__args.insecure,
                                          data={'csrftoken' : token[0],
                                                'username'  : username,
                                                'passcode'  : passcode})
             if response.status_code != 200:
-                print('ERROR authenticating to %s' % (self.__args.fqdn))
+                print(f'ERROR authenticating to {self.__args.fqdn}')
                 sys.exit(1)
             elif not re.search('Authentication Succeeded', response.text):
                 print('ERROR authenticating, credentials invalid.')
                 sys.exit(1)
-            self._saveCookie()
+            self.save_cookie()
             return
 
         except requests.exceptions.ConnectTimeout:
-            print('Unable to establish a connection to: https://%s' % (self.__args.fqdn))
+            print(f'Unable to establish a connection to: https://{self.__args.fqdn}')
         except (requests.exceptions.ProxyError,
                 urllib3.exceptions.ProxySchemeUnknown,
                 urllib3.exceptions.NewConnectionError):
-            print('Proxy information incorrect: %s' % (os.getenv('https_proxy')))
+            print(f'Proxy information incorrect: {os.getenv("https_proxy")}')
         except requests.exceptions.SSLError:
             print('Unable to establish a secure connection.',
                   'If you trust this server, you can use --insecure')
@@ -141,12 +164,14 @@ class Client:
             print('Unable to determine SOCKS version from https_proxy',
                   'environment variable')
         except requests.exceptions.ConnectionError:
-            print('General error connecting to server: https://%s' % (self.__args.fqdn))
+            print(f'General error connecting to server: https://{self.__args.fqdn}')
         sys.exit(1)
 
-    def install(self):
-        self._createSecureConnection()
-        print('Installing %s...' % (self.__args.application))
+    def install_package(self):
+        """ Install package using Conda API """
+        self.check_condaversion()
+        self.create_connection()
+        print(f'Installing {self.__args.application}...')
         pkg_variant = list(filter(None, [self.__args.package,
                                          self.__args.version,
                                          self.__args.build]))
@@ -163,9 +188,11 @@ class Client:
                               stdout=sys.stdout,
                               stderr=sys.stderr)
 
-    def update(self):
-        self._createSecureConnection()
-        print('Updating %s...' % (self.__args.application))
+    def update_package(self):
+        """ Update package using Conda API """
+        self.check_condaversion()
+        self.create_connection()
+        print(f'Updating {self.__args.application}...')
         conda_api.run_command('update',
                               '--all',
                               '--channel', self.__args.uri,
@@ -174,7 +201,8 @@ class Client:
                               stdout=sys.stdout,
                               stderr=sys.stderr)
 
-    def search(self):
+    def search_package(self):
+        """ Search for package, and report a formatted list """
         run_command = ['search',
                        '--override-channels',
                        '--channel',
@@ -190,7 +218,7 @@ class Client:
                             for x in std_out[0].split('\n')[3:-1:]]
                 unique_apps = '\n'.join(set(app_list))
                 print('# Use \'ncrc search name-of-application\' to list more detail\n# NCRC',
-                      'applications available:\n\n%s' % (unique_apps))
+                      f'applications available:\n\n{unique_apps}')
             else:
                 conda_api.run_command(*run_command,
                                       stdout=sys.stdout,
@@ -199,15 +227,19 @@ class Client:
             pass
 
 class SecureIDAdapter(BaseAdapter):
+    """ Our RSA Conda Adapter """
+    #pylint: disable=unused-argument
     def __init__(self, *args, **kwargs):
         super().__init__()
         self.log = logging.getLogger(__name__)
 
+    # Disable pylint check, this is outside our control (mock/injector method)
+    #pylint: disable=invalid-name,too-many-arguments,missing-function-docstring
     def send(self, request, stream=None, timeout=None, verify=None, cert=None, proxies=None):
         session = requests.Session()
         request.url = request.url.replace('rsa://', 'https://')
         fqdn = urlparse(request.url).hostname
-        cookie = getCookie(fqdn)
+        cookie = get_cookie(fqdn)
         session.cookies.update(cookie)
         response = session.get(request.url,
                                stream=stream,
@@ -218,6 +250,7 @@ class SecureIDAdapter(BaseAdapter):
         response.request = request
         return self.properResponse(response, request, fqdn)
 
+    #pylint: disable=invalid-name,missing-function-docstring
     def close(self):
         pass
 
@@ -234,22 +267,29 @@ class SecureIDAdapter(BaseAdapter):
             return null_response
         return response
 
+# Our mock object
+#pylint: disable=too-few-public-methods
 class CondaSessionRSA(CondaSession):
+    """ The RSA mock/injector class """
     def __init__(self, *args, **kwargs):
         CondaSession.__init__(self, *args, **kwargs)
         self.mount("rsa://", SecureIDAdapter(*args, **kwargs))
 
-def getCookie(fqdn):
-    cookie_file = '%s' % (os.path.sep).join([os.path.expanduser("~"),
-                                             '.RSASecureID_login',
-                                             fqdn])
+def get_cookie(fqdn):
+    """ return the cookie, if it exists """
+    cookie_file = (os.path.sep).join([os.path.expanduser('~'),
+                                      '.RSASecureID_login',
+                                      fqdn])
     cookie = {}
     if os.path.exists(cookie_file):
-        with open(cookie_file, 'rb') as f:
-            cookie.update(pickle.load(f))
+        with open(cookie_file, 'rb') as file_o:
+            cookie.update(pickle.load(file_o))
     return cookie
 
-def verifyArgs(args, parser):
+# Parsing arguments always requires lots of branches
+#pylint: disable=too-many-branches
+def verify_args(args):
+    """ Verify arguments supplied to ncrc """
     if not args.application and args.command not in ['update', 'list']:
         print('You must supply additional information when performing this action')
         sys.exit(1)
@@ -274,13 +314,13 @@ def verifyArgs(args, parser):
         args.package = ncrc_app
 
     # format package name (strip special characters, make lower case, prefix/brand it)
-    args.application = '%s' % (args.package.replace(args.prefix, ''))
-    args.package = '%s' % (args.package.replace(args.prefix, ''))
-    args.package = '%s' % (''.join(e for e in args.package if e.isalnum()))
-    args.package = '%s%s' % (args.prefix, args.package.lower())
+    args.application = args.package.replace(args.prefix, '')
+    args.package = args.package.replace(args.prefix, '')
+    args.package = ''.join(e for e in args.package if e.isalnum())
+    args.package = f'{args.prefix}{args.package.lower()}'
     if (args.command == 'install' and conda_environment != 'base'):
-        print(' Cannot install %s while not inside the base evironment.\n' % (args.package),
-              'Enter the base environment first with `conda activate base`.')
+        print(f' Cannot install {args.package} while not inside the base evironment.',
+              '\nEnter the base environment first with `conda activate base`.')
         sys.exit(1)
 
     if (args.command == 'update' and ncrc_app is None):
@@ -289,24 +329,24 @@ def verifyArgs(args, parser):
               '\n\tconda env list\n\nTo view available environments to activate.')
         sys.exit(1)
     elif (args.command == 'update' and ncrc_app and len(conda_environment.split('_')) > 1):
-        print(' You installed a specific version of %s.' % (ncrc_app), 'If you wish\n',
+        print(f' You installed a specific version of {ncrc_app}. If you wish\n',
               'to update to the lastest version, it would be best to install\n',
               'it into a new environment instead:\n\n\tconda activate base\n\tncrc install',
-              '%s\n\n or activate that environment and perform the update there.' % (ncrc_app))
+              f'{ncrc_app}\n\n or activate that environment and perform the update there.')
         sys.exit(1)
 
     if args.insecure:
-        from urllib3.exceptions import InsecureRequestWarning
         requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
-    args.fqdn = urlparse('rsa://%s' % (args.server)).hostname
+    args.fqdn = urlparse(f'rsa://{args.server}').hostname
     if args.command in ['search', 'list']:
-        args.uri = 'https://%s/ncrc-applications' % (args.server)
+        args.uri = f'https://{args.server}/ncrc-applications'
     else:
-        args.uri = 'rsa://%s/%s' % (args.server, args.package)
+        args.uri = f'rsa://{args.server}/{args.package}'
     return args
 
-def parseArgs(argv=None):
+def parse_args(argv=None):
+    """ Parse arguments with argparser """
     parser = argparse.ArgumentParser(description='Manage NCRC packages')
     formatter = lambda prog: argparse.HelpFormatter(prog, max_help_position=22, width=90)
     parent = argparse.ArgumentParser(add_help=False)
@@ -336,26 +376,27 @@ def parseArgs(argv=None):
     # Set the prefix for all apps. Perhaps someday this will be made into an argument (support
     # different application branding)
     args.prefix = 'ncrc-'
-    return verifyArgs(args, parser)
+    return verify_args(args)
 
 def main(argv=None):
+    """ entry point to NCRC client """
     if argv is None:
         argv = sys.argv[1:]
-    args = parseArgs(argv)
+    args = parse_args(argv)
     with mock.patch('conda.gateways.connection.session.CondaSession',
                     return_value=CondaSessionRSA()):
         ncrc = Client(args)
         if args.command == 'install':
-            ncrc.install()
+            ncrc.install_package()
         elif args.command == 'remove':
             print(' Due to the way ncrc wraps itself into conda commands, it is best to\n',
                   'remove the environment in which the application is installed. Begin\n',
                   'by deactivating the application environment and then remove it:',
-                  '\n\tconda deactivate\n\tconda env remove -n %s' % (args.application))
+                  f'\n\tconda deactivate\n\tconda env remove -n {args.application}')
         elif args.command == 'update':
-            ncrc.update()
+            ncrc.update_package()
         elif args.command in ['search', 'list']:
-            ncrc.search()
+            ncrc.search_package()
 
 if __name__ == '__main__':
     main()
