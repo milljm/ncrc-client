@@ -1,1 +1,3 @@
-version_str = "1.17"
+""" Set Version """
+#pylint: disable=invalid-name
+version_str = "1.18"
