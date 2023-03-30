@@ -87,6 +87,8 @@ class Client:
                        f'Required version:\t{".".join(self.__required_version)}\n'
                         'Please update Conda:\n\n\t`conda update conda`\n'))
                 sys.exit(1)
+            elif int(value) > int(self.__required_version[k_iter]):
+                return
 
     def save_cookie(self):
         """ Save the request object's cookie for additional connections """
