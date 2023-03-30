@@ -1,7 +1,7 @@
 {% set build = 0 %}
 {% set strbuild = "build_" + build|string %}
 {% set name = "ncrc" %}
-{% set version = "1.18" %}
+{% set version = "1.19" %}
 
 package:
   name: {{ name }}
