@@ -187,11 +187,15 @@ class Client:
         User Conda's Solver to get real tarball URL. As well as dependency information.
         We need the moose-dev version this package was built with.
         """
+        pkg_variant = list(filter(None, [self.__args.package,
+                                         self.__args.version,
+                                         self.__args.build]))
         solver = Solver(prefix='',
                         channels=["https://conda.software.inl.gov/ncrc-applications",
                                   "https://conda.software.inl.gov/public",
                                   "conda-forge"],
-                                  specs_to_add=[f'ncrc-{self.__args.application}'])
+                                  specs_to_add=[f'{"=".join(pkg_variant)}'])
+        print(f'Solving requirements for {self.__args.application}...')
         with suppress_stdout_stderr():
             out = solver.solve_final_state()
         wrong_url = out[len(out)-1].url
@@ -207,7 +211,7 @@ class Client:
         self.conda_info = json.loads(conda_api.run_command('info', '--all', '--json')[0])
         file_path = os.path.join(self.conda_info['pkgs_dirs'][0], f'local_{os.path.basename(url)}')
         if not os.path.exists(file_path):
-            print(f'\nDownloading {os.path.basename(url)}...')
+            print(f'Downloading {os.path.basename(url)}...')
             with self.session as response:
                 raw_download = response.get(url, stream=True)
                 total_size = int(raw_download.headers.get("content-length", 0))
