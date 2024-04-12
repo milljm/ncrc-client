@@ -72,7 +72,7 @@ from urllib3.exceptions import InsecureRequestWarning
 logging.getLogger(requests.packages.urllib3.__package__).setLevel(logging.ERROR)
 
 try:
-    import conda # Determin version
+    import conda # Determine version
     import conda.cli.python_api as conda_api
     from conda.api import Solver
 except ImportError:
@@ -206,16 +206,15 @@ class Client:
         if not os.path.exists(file_path):
             with tempfile.TemporaryFile() as tmp:
                 with self.session as response:
-                    print(f'Downloading {os.path.basename(url)}, please be patient (hundreds of '
-                          'megabytes)')
+                    print(f'\nDownloading {os.path.basename(url)}, please be patient...')
                     raw_download = response.get(url, stream=True)
                     tmp = raw_download.content
                 with open(file_path, 'wb') as f:
                     f.write(tmp)
         else:
-            print(f'Using local copy {os.path.basename(url)} already available.\nIf you suspect an '
-                  'issue with this file, consider running\n\n\t`conda clean --all --yes`\n\nand '
-                  'then try again.')
+            print(f'\nNot downloading {os.path.basename(url)}.\nUsing local copy already '
+                  'available. If you suspect an\nissue with this file, consider running'
+                  '\n\n\t`conda clean --all --yes`\n\nand then try again.\n')
         return file_path
 
     def install_package(self):
@@ -231,17 +230,17 @@ class Client:
         package_url = self.package_url()
         local_file = self.download_package(package_url)
         print(f'Installing necessary dependencies for {self.__args.application}...')
-        conda_api.run_command('create',
-                              '--name', '_'.join(name_variant),
-                              '--channel', self.__args.uri,
-                              *self.__channel_common,
-                              '='.join(pkg_variant),
-                              stdout=None,
-                              stderr=None)
+        with suppress_stdout_stderr():
+            conda_api.run_command('create',
+                                '--name', '_'.join(name_variant),
+                                '--channel', self.__args.uri,
+                                *self.__channel_common,
+                                '='.join(pkg_variant),
+                                stdout=None,
+                                stderr=None)
         try:
             # And now install our downloaded tarball
             print('Finalizing...')
-            # Silence this seemingly duplicate looking `conda install
             with suppress_stdout_stderr():
                 conda_api.run_command('run', '-n', '_'.join(name_variant), 'conda', 'install',
                                        local_file,
@@ -321,18 +320,18 @@ def verify_args(args):
     args.package = ''.join(e for e in args.package if e.isalnum())
     args.package = f'{args.prefix}{args.package.lower()}'
     if (args.command == 'install' and conda_environment != 'base'):
-        print(f' Cannot install {args.package} while not inside the base evironment.',
+        print(f' Cannot install {args.package} while not inside the base environment.',
               '\nEnter the base environment first with `conda activate base`.')
         sys.exit(1)
 
     if (args.command == 'update' and ncrc_app is None):
-        print(' Cannot perform an update while not inside said evironment. Please\n',
+        print(' Cannot perform an update while not inside said environment. Please\n',
               'activate the environment first and then run the command again. Use:\n',
               '\n\tconda env list\n\nTo view available environments to activate.')
         sys.exit(1)
     elif (args.command == 'update' and ncrc_app and len(conda_environment.split('_')) > 1):
         print(f' You installed a specific version of {ncrc_app}. If you wish\n',
-              'to update to the lastest version, it would be best to install\n',
+              'to update to the latest version, it would be best to install\n',
               'it into a new environment instead:\n\n\tconda activate base\n\tncrc install',
               f'{ncrc_app}\n\n or activate that environment and perform the update there.')
         sys.exit(1)
