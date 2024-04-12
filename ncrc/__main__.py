@@ -49,7 +49,6 @@ import pickle
 import errno
 from urllib.parse import urlparse
 import logging
-import tempfile
 
 # Silence the python_api import warning. The suggestion provided does not seem to exist yet:
 # DeprecationWarning: conda.cli.python_api is deprecated and will be removed in 24.9. Use
@@ -65,6 +64,7 @@ from os import devnull
 
 #pylint: disable=wrong-import-position
 import requests
+from tqdm.auto import tqdm
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
 
@@ -91,7 +91,6 @@ class Client:
                                  '--channel', 'conda-forge']
         if self.__args.insecure:
             self.__channel_common.append('--insecure')
-        self.conda_info = json.loads(conda_api.run_command('info', '--all', '--json')[0])
 
     def check_condaversion(self):
         """ Verify we are using an up to date Conda """
@@ -193,7 +192,8 @@ class Client:
                                   "https://conda.software.inl.gov/public",
                                   "conda-forge"],
                                   specs_to_add=[f'ncrc-{self.__args.application}'])
-        out = solver.solve_final_state()
+        with suppress_stdout_stderr():
+            out = solver.solve_final_state()
         wrong_url = out[len(out)-1].url
         correct_url = wrong_url.replace('ncrc-applications',f'ncrc-{self.__args.application}')
         return correct_url
@@ -202,19 +202,23 @@ class Client:
         """
         Download url using global session (with the cookie it contains).
         """
+        self.conda_info = json.loads(conda_api.run_command('info', '--all', '--json')[0])
         file_path = os.path.join(self.conda_info['pkgs_dirs'][0], f'local_{os.path.basename(url)}')
         if not os.path.exists(file_path):
-            with tempfile.TemporaryFile() as tmp:
-                with self.session as response:
-                    print(f'\nDownloading {os.path.basename(url)}, please be patient...')
-                    raw_download = response.get(url, stream=True)
-                    tmp = raw_download.content
-                with open(file_path, 'wb') as f:
-                    f.write(tmp)
+            print(f'\nDownloading {os.path.basename(url)}...')
+            with self.session as response:
+                raw_download = response.get(url, stream=True)
+                total_size = int(raw_download.headers.get("content-length", 0))
+                block_size = 1024
+                with tqdm(total=total_size, unit="B", unit_scale=True) as progress_bar:
+                    with open(file_path, "wb") as file:
+                        for data in raw_download.iter_content(block_size):
+                            progress_bar.update(len(data))
+                            file.write(data)
         else:
             print(f'\nNot downloading {os.path.basename(url)}.\nUsing local copy already '
-                  'available. If you suspect an\nissue with this file, consider running'
-                  '\n\n\t`conda clean --all --yes`\n\nand then try again.\n')
+                  'available. If you suspect an\nissue with this file, consider running:'
+                  '\n\n\tconda clean --all --yes\n\nand then try again.\n')
         return file_path
 
     def install_package(self):
@@ -229,10 +233,10 @@ class Client:
                                           self.__args.build]))
         package_url = self.package_url()
         local_file = self.download_package(package_url)
-        print(f'Installing necessary dependencies for {self.__args.application}...')
+        print(f'Installing necessary dependencies for {self.__args.application} (moose-dev)...')
         with suppress_stdout_stderr():
             conda_api.run_command('create',
-                                '--name', '_'.join(name_variant),
+                                '--name', '-'.join(name_variant),
                                 '--channel', self.__args.uri,
                                 *self.__channel_common,
                                 '='.join(pkg_variant),
@@ -240,16 +244,22 @@ class Client:
                                 stderr=None)
         try:
             # And now install our downloaded tarball
-            print('Finalizing...')
+            print(f'Installing {os.path.basename(package_url)}...')
             with suppress_stdout_stderr():
-                conda_api.run_command('run', '-n', '_'.join(name_variant), 'conda', 'install',
+                conda_api.run_command('run', '-n', '-'.join(name_variant), 'conda', 'install',
                                        local_file,
                                        stdout=None,
                                        stderr=None)
-        # unfortunately `conda run conda`` seems to trigger a bug in results.stdout in python_api
+        # unfortunately `conda run conda` seems to trigger a bug in results.stdout in python_api
         # but otherwise all operations have completed.
         except AttributeError:
             pass
+
+        print(f'\nInstallation Complete. To use {self.__args.application}, activate the'
+                  f'\nenvironment:\n\n\tconda activate {"-".join(name_variant)}\n\nDocumentation '
+                  'is locally available by activating\nthis environment and then pointing your web '
+                  'browser\nto the file denoted by echoing the following variable:\n\n\techo '
+                  f'${self.__args.application}_DOCS\n')
 
     def search_package(self):
         """ Search for package, and report a formatted list """
