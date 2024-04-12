@@ -224,7 +224,8 @@ class Client:
         else:
             print(f'\nNot downloading {os.path.basename(url)}.\nUsing local copy already '
                   'available. If you suspect an\nissue with this file, consider running:'
-                  '\n\n\tconda clean --all --yes\n\nand then try again.\n')
+                  '\n\n\tconda clean --all --yes\n\nand then try again. A new copy will be '
+                  'downloaded.\n')
         return file_path
 
     def install_package(self):
@@ -263,9 +264,11 @@ class Client:
 
         print(f'\nInstallation Complete. To use {self.__args.application}, activate the'
                   f'\nenvironment:\n\n\tconda activate {"-".join(name_variant)}\n\nDocumentation '
-                  'is locally available by activating\nthis environment and then pointing your web '
-                  'browser\nto the file denoted by echoing the following variable:\n\n\techo '
-                  f'${self.__args.application}_DOCS\n')
+                  'is locally available by activating this\nenvironment and then pointing your web '
+                  'browser to the\nfile denoted by echoing the following variable:\n\n\techo '
+                  f'${self.__args.application}_DOCS\n\nAdditional usage information is also '
+                  'available at\n\n\thttps://mooseframework.inl.gov/ncrc/applications/ncrc_conda_'
+                  f'{self.__args.application}.html\n\n')
 
     def search_package(self):
         """ Search for package, and report a formatted list """
