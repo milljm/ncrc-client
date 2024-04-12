@@ -202,6 +202,8 @@ class Client:
         """
         Download url using global session (with the cookie it contains).
         """
+        # Adding this to __init__ causes Info libmamba logging!?!?!
+        #pylint: disable=attribute-defined-outside-init
         self.conda_info = json.loads(conda_api.run_command('info', '--all', '--json')[0])
         file_path = os.path.join(self.conda_info['pkgs_dirs'][0], f'local_{os.path.basename(url)}')
         if not os.path.exists(file_path):
