@@ -262,6 +262,16 @@ class Client:
         except AttributeError:
             pass
 
+        # rename the local_ json meta file to its proper name had conda installed it normally.
+        # this allows NCRC packages to be listed among `conda list` after installation
+        json_file = local_file.replace('tar.bz2', 'json')
+        json_path = os.path.join(self.conda_info['envs_dirs'][0],
+                                 '-'.join(name_variant),
+                                 'conda-meta',
+                                 os.path.basename(json_file))
+        if os.path.exists(json_path):
+            os.rename(json_path, json_path.replace('local_',''))
+
         print(f'\nInstallation Complete. To use {self.__args.application}, activate the'
                   f'\nenvironment:\n\n\tconda activate {"-".join(name_variant)}\n\nDocumentation '
                   'is locally available by activating this\nenvironment and then pointing your web '
