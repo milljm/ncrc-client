@@ -380,18 +380,6 @@ def verify_args(args):
               '\nEnter the base environment first with `conda activate base`.')
         sys.exit(1)
 
-    if (args.command == 'update' and ncrc_app is None):
-        print(' Cannot perform an update while not inside said environment. Please\n',
-              'activate the environment first and then run the command again. Use:\n',
-              '\n\tconda env list\n\nTo view available environments to activate.')
-        sys.exit(1)
-    elif (args.command == 'update' and ncrc_app and len(conda_environment.split('_')) > 1):
-        print(f' You installed a specific version of {ncrc_app}. If you wish\n',
-              'to update to the latest version, it would be best to install\n',
-              'it into a new environment instead:\n\n\tconda activate base\n\tncrc install',
-              f'{ncrc_app}\n\n or activate that environment and perform the update there.')
-        sys.exit(1)
-
     if args.insecure:
         requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
