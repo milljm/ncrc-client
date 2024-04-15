@@ -201,8 +201,7 @@ class Client:
         wrong_url = out[len(out)-1].url
         correct_url = wrong_url.replace('ncrc-applications',f'ncrc-{self.__args.application}')
         return correct_url
-
-    def download_package(self, url):
+    def download_package(self, url, stop_fail=False):
         """
         Download url using global session (with the cookie it contains).
         """
@@ -211,9 +210,19 @@ class Client:
         self.conda_info = json.loads(conda_api.run_command('info', '--all', '--json')[0])
         file_path = os.path.join(self.conda_info['pkgs_dirs'][0], f'local_{os.path.basename(url)}')
         if not os.path.exists(file_path):
-            print(f'Downloading {os.path.basename(url)}...')
             with self.session as response:
                 raw_download = response.get(url, stream=True)
+                # alter URL to include archive channel and try again on 404 errors (allow once)
+                if raw_download.status_code == 404 and not stop_fail:
+                    response.close()
+                    print('Using archive channel')
+                    archive_url = url.replace(f'ncrc-{self.__args.application}',
+                                              f'ncrc-{self.__args.application}_archive', 1)
+                    return self.download_package(archive_url, stop_fail=True)
+                if raw_download.status_code == 404 and stop_fail:
+                    print(f'Failed to download: {url}')
+                    sys.exit(1)
+                print(f'Downloading {os.path.basename(url)}...')
                 total_size = int(raw_download.headers.get("content-length", 0))
                 block_size = 1024
                 with tqdm(total=total_size, unit="B", unit_scale=True) as progress_bar:
@@ -240,7 +249,7 @@ class Client:
                                           self.__args.build]))
         package_url = self.package_url()
         local_file = self.download_package(package_url)
-        print(f'Installing necessary dependencies for {self.__args.application} (moose-dev)...')
+        print(f'Installing necessary dependencies for {self.__args.application}...')
         with suppress_stdout_stderr():
             conda_api.run_command('create',
                                 '--name', '-'.join(name_variant),
@@ -348,6 +357,24 @@ def verify_args(args):
     args.package = args.package.replace(args.prefix, '')
     args.package = ''.join(e for e in args.package if e.isalnum())
     args.package = f'{args.prefix}{args.package.lower()}'
+
+    # Warn about installing older archive packages
+    # Date 20230511: pre moose-dev
+    # Date 20231218: pre dependency tracking Ref: https://github.com/idaholab/moose/issues/26343
+    int_version = re.compile(r'[^\d]+')
+    if args.version is not None and int(int_version.sub('', args.version)) < 20231218:
+        # pre moose-dev
+        if int(int_version.sub('', args.version)) < 20230511:
+            extra_package = f'moose-libmesh<={args.version}'
+        else:
+            extra_package = f'moose-dev<={args.version}'
+
+        print('\nNote: Requesting NCRC packages produced before December 18th 2023 will\n'
+              'result in failed dependencies. While these packages are still available\n'
+              'for download from the archive channel, you will need to perform these\n'
+              f'additional steps after installation:\n\n\tconda activate {args.application}-'
+              f'{args.version}\n\tconda install \'{extra_package}\'\n\n')
+
     if (args.command == 'install' and conda_environment != 'base'):
         print(f' Cannot install {args.package} while not inside the base environment.',
               '\nEnter the base environment first with `conda activate base`.')
@@ -400,7 +427,7 @@ def parse_args(argv=None):
                          help=('Prints information on how to remove application'),
                          formatter_class=formatter())
     subparser.add_parser('search', parents=[parent],
-                         help=('Perform a regular expression search for NCRC application'),
+                         help=('Search for and list all available versions matching query'),
                          formatter_class=formatter())
     subparser.add_parser('list', parents=[parent],
                          help=('List all available NCRC applications'),
@@ -428,8 +455,8 @@ def main(argv=None):
     if args.command == 'install':
         ncrc.install_package()
     elif args.command == 'remove':
-        print(f' You can remove {args.application} by running the following commands:',
-              f'\n\n\tconda env remove -n {args.application}\n')
+        print(' You can remove an NCRC Conda environment by running the following commands:',
+              '\n\n\tconda env list\n\tconda env remove -n \'name of environment\'\n')
     elif args.command in ['search', 'list']:
         ncrc.search_package()
 
