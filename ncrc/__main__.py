@@ -44,13 +44,27 @@ import sys
 import getpass
 import argparse
 import re
+import json
 import pickle
 import errno
 from urllib.parse import urlparse
-from unittest import mock
-from io import StringIO
 import logging
+
+# Silence the python_api import warning. The suggestion provided does not seem to exist yet:
+# DeprecationWarning: conda.cli.python_api is deprecated and will be removed in 24.9. Use
+# `conda.testing.conda_cli` instead.
+# Further more, importing conda.testing requires addition conda packages which are not available
+# after a standard install of Conda; this all feels rather to new to be a deprecation warning.
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+#pylint: disable=wrong-import-position
+from contextlib import contextmanager,redirect_stderr,redirect_stdout
+from os import devnull
+
+#pylint: disable=wrong-import-position
 import requests
+from tqdm.auto import tqdm
 import urllib3
 from urllib3.exceptions import InsecureRequestWarning
 
@@ -58,10 +72,9 @@ from urllib3.exceptions import InsecureRequestWarning
 logging.getLogger(requests.packages.urllib3.__package__).setLevel(logging.ERROR)
 
 try:
-    import conda # Determin version
+    import conda # Determine version
     import conda.cli.python_api as conda_api
-    from conda.gateways.connection.session import CondaSession
-    from conda.gateways.connection import BaseAdapter
+    from conda.api import Solver
 except ImportError:
     print('Unable to import Conda API. Please install conda: `conda install conda`')
     sys.exit(1)
@@ -72,7 +85,7 @@ class Client:
     def __init__(self, args):
         self.session = requests.Session()
         self.__args = args
-        self.__required_version = ['22', '11', '0']
+        self.__required_version = ['23', '11', '0']
         self.__channel_common = ['--channel', 'https://conda.software.inl.gov/public',
                                  '--channel', 'https://conda.software.inl.gov/archive',
                                  '--channel', 'conda-forge']
@@ -169,39 +182,112 @@ class Client:
             print(f'General error connecting to server: https://{self.__args.fqdn}')
         sys.exit(1)
 
+    def package_url(self):
+        """
+        User Conda's Solver to get real tarball URL. As well as dependency information.
+        We need the moose-dev version this package was built with.
+        """
+        pkg_variant = list(filter(None, [self.__args.package,
+                                         self.__args.version,
+                                         self.__args.build]))
+        solver = Solver(prefix='',
+                        channels=["https://conda.software.inl.gov/ncrc-applications",
+                                  "https://conda.software.inl.gov/public",
+                                  "conda-forge"],
+                                  specs_to_add=[f'{"=".join(pkg_variant)}'])
+        print(f'Solving requirements for {self.__args.application}...')
+        with suppress_stdout_stderr():
+            out = solver.solve_final_state()
+        wrong_url = out[len(out)-1].url
+        correct_url = wrong_url.replace('ncrc-applications',f'ncrc-{self.__args.application}')
+        return correct_url
+    def download_package(self, url, stop_fail=False):
+        """
+        Download url using global session (with the cookie it contains).
+        """
+        # Adding this to __init__ causes Info libmamba logging!?!?!
+        #pylint: disable=attribute-defined-outside-init
+        self.conda_info = json.loads(conda_api.run_command('info', '--all', '--json')[0])
+        file_path = os.path.join(self.conda_info['pkgs_dirs'][0], f'local_{os.path.basename(url)}')
+        if not os.path.exists(file_path):
+            with self.session as response:
+                raw_download = response.get(url, stream=True)
+                # alter URL to include archive channel and try again on 404 errors (allow once)
+                if raw_download.status_code == 404 and not stop_fail:
+                    response.close()
+                    print('Using archive channel')
+                    archive_url = url.replace(f'ncrc-{self.__args.application}',
+                                              f'ncrc-{self.__args.application}_archive', 1)
+                    return self.download_package(archive_url, stop_fail=True)
+                if raw_download.status_code == 404 and stop_fail:
+                    print(f'Failed to download: {url}')
+                    sys.exit(1)
+                print(f'Downloading {os.path.basename(url)}...')
+                total_size = int(raw_download.headers.get("content-length", 0))
+                block_size = 1024
+                with tqdm(total=total_size, unit="B", unit_scale=True) as progress_bar:
+                    with open(file_path, "wb") as file:
+                        for data in raw_download.iter_content(block_size):
+                            progress_bar.update(len(data))
+                            file.write(data)
+        else:
+            print(f'\nNot downloading {os.path.basename(url)}.\nUsing local copy already '
+                  'available. If you suspect an\nissue with this file, consider running:'
+                  '\n\n\tconda clean --all --yes\n\nand then try again. A new copy will be '
+                  'downloaded.\n')
+        return file_path
+
     def install_package(self):
         """ Install package using Conda API """
         self.check_condaversion()
         self.create_connection()
-        print(f'Installing {self.__args.application}...')
         pkg_variant = list(filter(None, [self.__args.package,
                                          self.__args.version,
                                          self.__args.build]))
         name_variant = list(filter(None, [self.__args.application,
                                           self.__args.version,
                                           self.__args.build]))
-        conda_api.run_command('create',
-                              '--name', '_'.join(name_variant),
-                              '--channel', self.__args.uri,
-                              '--channel', f'{self.__args.uri}_archive',
-                              *self.__channel_common,
-                              'ncrc',
-                              '='.join(pkg_variant),
-                              stdout=sys.stdout,
-                              stderr=sys.stderr)
+        package_url = self.package_url()
+        local_file = self.download_package(package_url)
+        print(f'Installing necessary dependencies for {self.__args.application}...')
+        with suppress_stdout_stderr():
+            conda_api.run_command('create',
+                                '--name', '-'.join(name_variant),
+                                '--channel', self.__args.uri,
+                                *self.__channel_common,
+                                '='.join(pkg_variant),
+                                stdout=None,
+                                stderr=None)
+        try:
+            # And now install our downloaded tarball
+            print(f'Installing {os.path.basename(package_url)}...')
+            with suppress_stdout_stderr():
+                conda_api.run_command('run', '-n', '-'.join(name_variant), 'conda', 'install',
+                                       local_file,
+                                       stdout=None,
+                                       stderr=None)
+        # unfortunately `conda run conda` seems to trigger a bug in results.stdout in python_api
+        # but otherwise all operations have completed.
+        except AttributeError:
+            pass
 
-    def update_package(self):
-        """ Update package using Conda API """
-        self.check_condaversion()
-        self.create_connection()
-        print(f'Updating {self.__args.application}...')
-        conda_api.run_command('update',
-                              '--all',
-                              '--channel', self.__args.uri,
-                              '--channel', f'{self.__args.uri}_archive',
-                              *self.__channel_common,
-                              stdout=sys.stdout,
-                              stderr=sys.stderr)
+        # rename the local_ json meta file to its proper name had conda installed it normally.
+        # this allows NCRC packages to be listed among `conda list` after installation
+        json_file = local_file.replace('tar.bz2', 'json')
+        json_path = os.path.join(self.conda_info['envs_dirs'][0],
+                                 '-'.join(name_variant),
+                                 'conda-meta',
+                                 os.path.basename(json_file))
+        if os.path.exists(json_path):
+            os.rename(json_path, json_path.replace('local_',''))
+
+        print(f'\nInstallation Complete. To use {self.__args.application}, activate the'
+                  f'\nenvironment:\n\n\tconda activate {"-".join(name_variant)}\n\nDocumentation '
+                  'is locally available by activating this\nenvironment and then pointing your web '
+                  'browser to the\nfile denoted by echoing the following variable:\n\n\techo '
+                  f'${self.__args.application}_DOCS\n\nAdditional usage information is also '
+                  'available at\n\n\thttps://mooseframework.inl.gov/ncrc/applications/ncrc_conda_'
+                  f'{self.__args.application}.html\n\n')
 
     def search_package(self):
         """ Search for package, and report a formatted list """
@@ -227,55 +313,6 @@ class Client:
                                       stderr=sys.stderr)
         except: # pylint: disable=bare-except
             pass
-
-class SecureIDAdapter(BaseAdapter):
-    """ Our RSA Conda Adapter """
-    #pylint: disable=unused-argument
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-        self.log = logging.getLogger(__name__)
-
-    # Disable pylint check, this is outside our control (mock/injector method)
-    #pylint: disable=invalid-name,too-many-arguments,missing-function-docstring
-    def send(self, request, stream=None, timeout=None, verify=None, cert=None, proxies=None):
-        session = requests.Session()
-        request.url = request.url.replace('rsa://', 'https://')
-        fqdn = urlparse(request.url).hostname
-        cookie = get_cookie(fqdn)
-        session.cookies.update(cookie)
-        response = session.get(request.url,
-                               stream=stream,
-                               timeout=1,
-                               verify=verify,
-                               cert=cert,
-                               proxies=proxies)
-        response.request = request
-        return self.properResponse(response, request, fqdn)
-
-    #pylint: disable=invalid-name,missing-function-docstring
-    def close(self):
-        pass
-
-    def properResponse(self, response, request, fqdn):
-        """ Return non exception causing response when certain conditions arise """
-        # RSA sites are Text, while Conda is application/*
-        if 'application' not in response.headers['Content-Type']:
-            null_response = requests.Response()
-            null_response.raw = StringIO()
-            null_response.url = request.url
-            null_response.request = request
-            null_response.status_code = 204
-            self.log.warning('RSA Token expired or channel does not exist')
-            return null_response
-        return response
-
-# Our mock object
-#pylint: disable=too-few-public-methods
-class CondaSessionRSA(CondaSession):
-    """ The RSA mock/injector class """
-    def __init__(self, *args, **kwargs):
-        CondaSession.__init__(self, *args, **kwargs)
-        self.mount("rsa://", SecureIDAdapter(*args, **kwargs))
 
 def get_cookie(fqdn):
     """ return the cookie, if it exists """
@@ -320,21 +357,27 @@ def verify_args(args):
     args.package = args.package.replace(args.prefix, '')
     args.package = ''.join(e for e in args.package if e.isalnum())
     args.package = f'{args.prefix}{args.package.lower()}'
-    if (args.command == 'install' and conda_environment != 'base'):
-        print(f' Cannot install {args.package} while not inside the base evironment.',
-              '\nEnter the base environment first with `conda activate base`.')
-        sys.exit(1)
 
-    if (args.command == 'update' and ncrc_app is None):
-        print(' Cannot perform an update while not inside said evironment. Please\n',
-              'activate the environment first and then run the command again. Use:\n',
-              '\n\tconda env list\n\nTo view available environments to activate.')
-        sys.exit(1)
-    elif (args.command == 'update' and ncrc_app and len(conda_environment.split('_')) > 1):
-        print(f' You installed a specific version of {ncrc_app}. If you wish\n',
-              'to update to the lastest version, it would be best to install\n',
-              'it into a new environment instead:\n\n\tconda activate base\n\tncrc install',
-              f'{ncrc_app}\n\n or activate that environment and perform the update there.')
+    # Warn about installing older archive packages
+    # Date 20230511: pre moose-dev
+    # Date 20231218: pre dependency tracking Ref: https://github.com/idaholab/moose/issues/26343
+    int_version = re.compile(r'[^\d]+')
+    if args.version is not None and int(int_version.sub('', args.version)) < 20231218:
+        # pre moose-dev
+        if int(int_version.sub('', args.version)) < 20230511:
+            extra_package = f'moose-libmesh<={args.version}'
+        else:
+            extra_package = f'moose-dev<={args.version}'
+
+        print('\nNote: Requesting NCRC packages produced before December 18th 2023 will\n'
+              'result in failed dependencies. While these packages are still available\n'
+              'for download from the archive channel, you will need to perform these\n'
+              f'additional steps after installation:\n\n\tconda activate {args.application}-'
+              f'{args.version}\n\tconda install \'{extra_package}\'\n\n')
+
+    if (args.command == 'install' and conda_environment != 'base'):
+        print(f' Cannot install {args.package} while not inside the base environment.',
+              '\nEnter the base environment first with `conda activate base`.')
         sys.exit(1)
 
     if args.insecure:
@@ -345,34 +388,38 @@ def verify_args(args):
         args.uri = f'https://{args.server}/ncrc-applications'
     else:
         args.uri = f'rsa://{args.server}/{args.package}'
+        args.uri = f'https://{args.server}/ncrc-applications'
     return args
+
+def formatter():
+    """
+    Helper lambda for argparse formatting
+    """
+    return lambda prog: argparse.HelpFormatter(prog, max_help_position=22, width=90)
 
 def parse_args(argv=None):
     """ Parse arguments with argparser """
     parser = argparse.ArgumentParser(description='Manage NCRC packages')
-    formatter = lambda prog: argparse.HelpFormatter(prog, max_help_position=22, width=90)
     parent = argparse.ArgumentParser(add_help=False)
     parent.add_argument('application', nargs="?", default='',
                         help='The application you wish to work with')
     parent.add_argument('server', nargs="?", default='conda.software.inl.gov',
                         help='The server containing the conda packages (default: %(default)s)')
     parent.add_argument('-k', '--insecure', action="store_true", default=False,
-                        help=('Allow untrusted connections'))
+                        help='Allow untrusted connections')
     subparser = parser.add_subparsers(dest='command', help='Available Commands.')
     subparser.required = True
     subparser.add_parser('install', parents=[parent], help='Install application',
-                         formatter_class=formatter)
+                         formatter_class=formatter())
     subparser.add_parser('remove', parents=[parent],
                          help=('Prints information on how to remove application'),
-                         formatter_class=formatter)
-    subparser.add_parser('update', parents=[parent], help='Update application',
-                         formatter_class=formatter)
+                         formatter_class=formatter())
     subparser.add_parser('search', parents=[parent],
-                         help=('Perform a regular expression search for NCRC application'),
-                         formatter_class=formatter)
+                         help=('Search for and list all available versions matching query'),
+                         formatter_class=formatter())
     subparser.add_parser('list', parents=[parent],
                          help=('List all available NCRC applications'),
-                         formatter_class=formatter)
+                         formatter_class=formatter())
     args = parser.parse_args(argv)
 
     # Set the prefix for all apps. Perhaps someday this will be made into an argument (support
@@ -380,25 +427,26 @@ def parse_args(argv=None):
     args.prefix = 'ncrc-'
     return verify_args(args)
 
+@contextmanager
+def suppress_stdout_stderr():
+    """A context manager that redirects stdout and stderr to devnull"""
+    with open(devnull, 'w', encoding='utf-8') as f_null:
+        with redirect_stderr(f_null) as err, redirect_stdout(f_null) as out:
+            yield (err, out)
+
 def main(argv=None):
     """ entry point to NCRC client """
     if argv is None:
         argv = sys.argv[1:]
     args = parse_args(argv)
-    with mock.patch('conda.gateways.connection.session.CondaSession',
-                    return_value=CondaSessionRSA()):
-        ncrc = Client(args)
-        if args.command == 'install':
-            ncrc.install_package()
-        elif args.command == 'remove':
-            print(' Due to the way ncrc wraps itself into conda commands, it is best to\n',
-                  'remove the environment in which the application is installed. Begin\n',
-                  'by deactivating the application environment and then remove it:',
-                  f'\n\tconda deactivate\n\tconda env remove -n {args.application}')
-        elif args.command == 'update':
-            ncrc.update_package()
-        elif args.command in ['search', 'list']:
-            ncrc.search_package()
+    ncrc = Client(args)
+    if args.command == 'install':
+        ncrc.install_package()
+    elif args.command == 'remove':
+        print(' You can remove an NCRC Conda environment by running the following commands:',
+              '\n\n\tconda env list\n\tconda env remove -n \'name of environment\'\n')
+    elif args.command in ['search', 'list']:
+        ncrc.search_package()
 
 if __name__ == '__main__':
     main()
