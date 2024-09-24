@@ -135,7 +135,7 @@ class Client:
         response = self.session.get((f'https://{self.__args.fqdn}/{self.__args.package}/'
                                       'channeldata.json'), verify=not self.__args.insecure)
 
-        if response.status_code == 200 and 'application' in response.headers['Content-Type']:
+        if response.status_code == 200 and 'application' in response.headers.get('Content-Type',''):
             return True
         return False
 
@@ -256,6 +256,7 @@ class Client:
                                 '--channel', self.__args.uri,
                                 *self.__channel_common,
                                 '='.join(pkg_variant),
+                                'mpich',
                                 stdout=None,
                                 stderr=None)
         try:
