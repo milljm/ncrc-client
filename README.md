@@ -55,9 +55,7 @@ permission to make contributions and grant the required license on behalf of tha
 # NCRC Client
 
 The NCRC client allows users to search, and install Conda packages contained behind an RSA protected
-server. Technically, on the server-side, the packages produced for use by this tool must establish a
-certain prefix ('ncrc-' in this case). The end-user however need not worry about any prefix
-semantics. The NCRC client will handle whether or not users supply or not supply a prefix.
+server.
 
 ## Install NCRC
 
