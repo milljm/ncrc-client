@@ -108,7 +108,7 @@ optional arguments:
   -h, --help            show this help message and exit
 ```
 
-### NCRC Usage Examples
+### NCRC Examples Usages
 
 ```bash
 $> ncrc list
@@ -131,22 +131,29 @@ List all available NCRC applications
 $> ncrc search griffin
 Loading channels: done
 # Name                       Version           Build  Channel
-ncrc-griffin              2021_07_29         build_0  ncrc-applications
+... <trimmed>
+ncrc-griffin              2024_09_30         build_0  ncrc-applications
+ncrc-griffin              2024_10_11         build_0  ncrc-applications
+
+Note: Only the last 90 days worth of packages are available. Older
+      packages can be made available upon request.
+      https://mooseframework.inl.gov/help/inl/applications.html
 ```
 Lists all available versions of griffin
 
 ```bash
-$> ncrc install bison=2021_07_28
+$> ncrc install griffin=2024_09_30
 Username: johndoe
 PIN+TOKEN:
-Installing bison=2021_07_28...
+Solving requirements for griffin...
+Downloading ncrc-griffin-2024_10_11-build_0.tar.bz2...
 
 # after installation completes
-$> conda activate bison
-$> bison-opt --version
+$> conda activate griffin
+$> griffin-opt --version
 <the version is displayed>
 ```
-Install a specific version.
+Installing a specific version.
 
 ```bash
 $> ncrc remove bison
@@ -159,3 +166,23 @@ $> ncrc remove bison
 
 The NCRC script being a wrapper tool, is unable to perform such a function. The user must deactivate
 the environment and remove that environment using the appropraite conda commands.
+
+## Troubleshooting
+
+The occasional download failure is usually a victim of circumstance. Where the only solution is to
+"try again". If the issue persists, check with our Discussions group for any known outages:
+https://github.com/idaholab/moose/discussions/28494. If there are none, feel free to create a new
+discusion to report any failures.
+
+If you receive invalid credentials, you'll want to head on over to the NCRC page for contacting
+help: https://inl.gov/ncrc/ (Make/Manage Requests, contact information will be listed on the left).
+
+If you are running into a `command not found` error, chances are, you not operating within the
+Conda environment for which you installed the NCRC client. Be sure you installed the client into
+your (base) environment, or that you are in the (base) environment while attempting to invoke
+`ncrc`:
+
+```bash
+$> conda activate base
+$> ncrc --help
+```
