@@ -54,20 +54,22 @@ permission to make contributions and grant the required license on behalf of tha
 
 # NCRC Client
 
-The NCRC client allows users to search, and install Conda packages contained behind an RSA protected
-server.
+The NCRC client allows users to search for, and install NCRC applications protected behind an RSA
+credential challenge. The NCRC client itself is open source, and available publicly.
 
-## Install NCRC
+#### NCRC Client Installation
 
-The NCRC client is available via INL's public Conda channel repository or from the Anaconda Idaholab
-channel.
-
-INL Conda Repository:
 ```bash
 $> conda install ncrc --channel https://conda.software.inl.gov/public
 ```
 
 ## Install an NCRC Application
+
+With the NCRC client installed, you can now use it to install an NCRC Application.
+
+> [!IMPORTANT]
+> You will first need to be granted access to the applicable application. To do so, head on over
+> to https://inl.gov/ncrc/ to request access.
 
 ```bash
 $> ncrc install bison
@@ -83,8 +85,8 @@ $> bison-opt --version
 <version is displayed>
 ```
 > [!NOTE]
-> The first time you run the application after installation, the application may appear to hang.
-> Consecutive runs will not be hindered.
+> The first time you run the application, the application may appear to hang. Consecutive runs will
+> not be hindered.
 
 ### NCRC Syntax
 
