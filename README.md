@@ -110,6 +110,7 @@ optional arguments:
 
 ### NCRC Examples Usages
 
+List all available NCRC applications:
 ```bash
 $> ncrc list
 # Use 'ncrc search name-of-application' to list more detail
@@ -125,8 +126,8 @@ $> ncrc list
 	marmot
 	sabertooth
 ```
-List all available NCRC applications
 
+Lists all available versions of griffin:
 ```bash
 $> ncrc search griffin
 Loading channels: done
@@ -139,8 +140,9 @@ Note: Only the last 90 days worth of packages are available. Older
       packages can be made available upon request.
       https://mooseframework.inl.gov/help/inl/applications.html
 ```
-Lists all available versions of griffin
 
+
+Installing a specific version:
 ```bash
 $> ncrc install griffin=2024_09_30
 Username: johndoe
@@ -153,8 +155,8 @@ $> conda activate griffin
 $> griffin-opt --version
 <the version is displayed>
 ```
-Installing a specific version.
 
+Removing an application:
 ```bash
 $> ncrc remove bison
  Due to the way ncrc wraps itself into conda commands, it is best to
@@ -164,8 +166,9 @@ $> ncrc remove bison
 	conda env remove -n bison
 ```
 
-The NCRC script being a wrapper tool, is unable to perform such a function. The user must deactivate
-the environment and remove that environment using the appropraite conda commands.
+> [!NOTE]
+> The NCRC script being a wrapper tool, is unable to perform such a function. The user must
+> deactivate the environment and remove that environment using the appropraite conda commands.
 
 ## Troubleshooting
 
